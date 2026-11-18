@@ -1,7 +1,9 @@
-const { DEFAULTS, isJetBrains, parseMappings, serializeMappings, resolveRoot, ideUrl, checkPath } = globalThis.GH2IDE;
-const $ = (id) => document.getElementById(id);
+import { parseMappings, serializeMappings, resolveRoot, ideUrl, checkPath, type Config, type Mapping, type PathCheck } from '@/utils/ide';
+import { loadConfig, saveConfig } from '@/utils/config';
 
-let comments = []; // lignes "# …" des correspondances, conservées telles quelles
+const $ = <T extends HTMLElement = HTMLInputElement>(id: string) => document.getElementById(id) as T;
+
+let comments: string[] = []; // lignes "# …" des correspondances, conservées telles quelles
 
 // ---------- Affichage conditionnel ----------
 
@@ -13,7 +15,7 @@ function toggle() {
   $('xcodeBox').style.display = ide === 'xcode' ? 'block' : 'none';
 }
 
-function showMsg(el, res) {
+function showMsg(el: HTMLElement, res: PathCheck | null) {
   el.className = 'msg' + (res ? ' ' + res.level : '');
   el.textContent = res ? res.text : '';
 }
@@ -54,20 +56,25 @@ function addRow(repo = '', path = '', focus = false) {
 }
 
 // Accepte une URL GitHub collée dans le champ dépôt.
-function cleanRepo(v) {
+function cleanRepo(v: string) {
   const m = v.trim().match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/\s]+)\/([^/\s#?]+)/i);
-  return m ? `${m[1]}/${m[2].replace(/\.git$/, '')}` : v.trim();
+  return m ? `${m[1]}/${m[2]!.replace(/\.git$/, '')}` : v.trim();
 }
 
-function readRows() {
-  return [...$('maps').querySelectorAll('input.repo')].map((r) => ({ repo: r.value, path: r.nextElementSibling.value }));
+// Chaque ligne : input.repo, input.path, bouton supprimer, message.
+const repoInputs = () => [...$('maps').querySelectorAll<HTMLInputElement>('input.repo')];
+const pathOf = (r: HTMLInputElement) => r.nextElementSibling as HTMLInputElement;
+const msgOf = (r: HTMLInputElement) => pathOf(r).nextElementSibling!.nextElementSibling as HTMLElement;
+
+function readRows(): Mapping[] {
+  return repoInputs().map((r) => ({ repo: r.value, path: pathOf(r).value }));
 }
 
 function validate() {
   const home = $('home').value;
-  for (const r of $('maps').querySelectorAll('input.repo')) {
-    const p = r.nextElementSibling;
-    const msg = p.nextElementSibling.nextElementSibling;
+  for (const r of repoInputs()) {
+    const p = pathOf(r);
+    const msg = msgOf(r);
     let res = checkPath(p.value, home);
     if (!res && r.value.trim() && !p.value.trim()) res = { level: 'warn', text: 'Dossier manquant : cette ligne est ignorée.' };
     if (!res && !r.value.trim() && p.value.trim()) res = { level: 'warn', text: 'Dépôt manquant : cette ligne est ignorée.' };
@@ -81,31 +88,31 @@ function validate() {
 }
 
 // /Users/<nom>/… ou /home/<nom>/… → dossier personnel, s'il n'est pas encore renseigné.
-function guessHome(path) {
+function guessHome(path: string) {
   if ($('home').value.trim()) return;
   const m = (path || '').trim().match(/^(\/Users\/[^/]+|\/home\/[^/]+)(\/|$)/);
   if (m) {
-    $('home').value = m[1];
+    $('home').value = m[1]!;
     changed();
   }
 }
 
 // ---------- Enregistrement automatique ----------
 
-function current() {
+function current(): Config {
   return {
-    ide: $('ide').value,
+    ide: $('ide').value as Config['ide'],
     template: $('template').value.trim(),
     baseDir: $('baseDir').value.trim(),
     mappings: serializeMappings(readRows().filter((r) => checkPath(r.path, $('home').value)?.level !== 'err'), comments),
     home: $('home').value.trim(),
     hoverButton: $('hoverButton').checked,
-    jbPort: ($('jbPort').value.trim().match(/^\d+$/) || ['63342'])[0],
+    jbPort: ($('jbPort').value.trim().match(/^\d+$/) || ['63342'])[0]!,
   };
 }
 
-let saveTimer;
-let statusTimer;
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let statusTimer: ReturnType<typeof setTimeout> | undefined;
 function changed() {
   validate();
   test();
@@ -113,7 +120,7 @@ function changed() {
   $('status').className = '';
   $('status').textContent = 'Modifications…';
   saveTimer = setTimeout(async () => {
-    await chrome.storage.sync.set(current());
+    await saveConfig(current());
     $('status').className = 'ok';
     $('status').textContent = 'Enregistré ✓';
     clearTimeout(statusTimer);
@@ -124,15 +131,15 @@ function changed() {
 // ---------- Test ----------
 
 // URL GitHub (blob, PR, commit, dépôt) ou "owner/repo/chemin[:ligne]".
-function parseTarget(input) {
+function parseTarget(input: string) {
   let v = input.trim();
   if (!v) return null;
   let line = 1;
   const hash = v.match(/#L(\d+)/);
-  if (hash) line = +hash[1];
+  if (hash) line = +hash[1]!;
   v = v.replace(/#.*$/, '').replace(/\?.*$/, '');
   const colon = v.match(/:(\d+)$/);
-  if (colon) { line = +colon[1]; v = v.slice(0, -colon[0].length); }
+  if (colon) { line = +colon[1]!; v = v.slice(0, -colon[0].length); }
   v = v.replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, '').replace(/^\/+/, '');
   const parts = v.split('/').filter(Boolean);
   if (parts.length < 2) return null;
@@ -140,10 +147,10 @@ function parseTarget(input) {
   let rel = null;
   if (kind === 'blob' || kind === 'tree') rel = rest.slice(1).join('/') || null; // blob/<ref>/<chemin>
   else if (kind && !['pull', 'commit', 'compare', 'issues'].includes(kind)) rel = [kind, ...rest].join('/');
-  return { owner, repo: repo.replace(/\.git$/, ''), rel, line };
+  return { owner: owner!, repo: repo!.replace(/\.git$/, ''), rel, line };
 }
 
-let lastUrl = null;
+let lastUrl: string | null = null;
 function test() {
   const out = $('testResult');
   const t = parseTarget($('testInput').value);
@@ -155,7 +162,8 @@ function test() {
   }
   const cfg = current();
   const res = resolveRoot(cfg, t.owner, t.repo);
-  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ESC[c]!);
   const lines = [];
   if (!res) {
     lines.push(`<div class="msg err">Aucun dossier local pour <code>${esc(t.owner)}/${esc(t.repo)}</code> : ajouter le dépôt à l'étape 2.</div>`);
@@ -196,7 +204,7 @@ $('testOpen').addEventListener('click', async () => {
 
 // ---------- Chargement ----------
 
-chrome.storage.sync.get(DEFAULTS).then((v) => {
+loadConfig().then((v) => {
   $('ide').value = v.ide;
   $('template').value = v.template;
   $('baseDir').value = v.baseDir;
@@ -207,7 +215,7 @@ chrome.storage.sync.get(DEFAULTS).then((v) => {
   comments = parsed.comments;
   parsed.rows.forEach((r) => addRow(r.repo, r.path));
   if (!parsed.rows.length) addRow();
-  if (v.home && /^~/.test(v.baseDir)) $('home').closest('details').open = true;
+  if (v.home && /^~/.test(v.baseDir)) $('home').closest('details')!.open = true;
   toggle();
   validate();
   test();

@@ -1,11 +1,15 @@
-(() => {
-  'use strict';
+import './style.css';
+import { DEFAULTS, localRoot, ideUrl, type Config } from '@/utils/ide';
+import { loadConfig } from '@/utils/config';
 
-  const { DEFAULTS, localRoot, ideUrl } = globalThis.GH2IDE;
-  let cfg = { ...DEFAULTS };
-  chrome.storage.sync.get(DEFAULTS).then((v) => { cfg = v; });
-  chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === 'sync') for (const k in ch) cfg[k] = ch[k].newValue;
+export default defineContentScript({
+  matches: ['https://github.com/*'],
+  runAt: 'document_idle',
+  main() {
+  let cfg: Config = { ...DEFAULTS };
+  loadConfig().then((v) => { cfg = v; });
+  browser.storage.onChanged.addListener((ch, area) => {
+    if (area === 'sync') for (const k in ch) (cfg as any)[k] = ch[k]?.newValue;
   });
 
   const LINE_CELL = 'td[data-line-number]:not(.diff-text-cell)';
@@ -14,17 +18,17 @@
   const ANY_CELL = `${LINE_CELL}, ${THREAD_CELL}`;
   const THREAD_LINK = 'h2 a[href*="#r"]';
   const HASH_ID = /^diff-[0-9a-f]{64}$/;
-  const clean = (s) => s.replace(/[\u200e\u200f\u202a-\u202e]/g, '').trim();
+  const clean = (s: string | null | undefined) => (s ?? '').replace(/[\u200e\u200f\u202a-\u202e]/g, '').trim();
 
   // ---------- Reading the page ----------
 
-  function repoInfo() {
+  function repoInfo(): { owner: string; repo: string } | null {
     const m = location.pathname.match(/^\/([^/]+)\/([^/]+)/);
-    return m ? { owner: m[1], repo: m[2] } : null;
+    return m ? { owner: m[1]!, repo: m[2]! } : null;
   }
 
-  function filePathFor(el) {
-    for (let p = el; p && p !== document.body; p = p.parentElement) {
+  function filePathFor(el: Element): string | null {
+    for (let p: Element | null = el; p && p !== document.body; p = p.parentElement) {
       // New React diff view: <div id="diff-<sha256(path)>">
       if (p.id && HASH_ID.test(p.id)) {
         const b = p.querySelector('[data-file-path]');
@@ -36,7 +40,7 @@
       if (p.tagName === 'ARTICLE') {
         const links = [...p.querySelectorAll(THREAD_LINK)];
         const paths = new Set(links.map((a) => clean(a.textContent)));
-        if (paths.size === 1) return [...paths][0];
+        if (paths.size === 1) return [...paths][0]!;
       }
       // Classic diff view
       if (p.hasAttribute && p.hasAttribute('data-tagsearch-path')) return p.getAttribute('data-tagsearch-path');
@@ -46,26 +50,26 @@
       }
     }
     // Last resort: nearest ancestor whose path markers all agree
-    for (let p = el, i = 0; p && i < 12; p = p.parentElement, i++) {
+    for (let p: Element | null = el, i = 0; p && i < 12; p = p.parentElement, i++) {
       const marks = p.querySelectorAll ? [...p.querySelectorAll('[data-file-path], [data-path]')] : [];
       if (!marks.length) continue;
       const vals = new Set(marks.map((m) => m.getAttribute('data-file-path') || m.getAttribute('data-path')));
-      return vals.size === 1 ? [...vals][0] : null;
+      return vals.size === 1 ? ([...vals][0] ?? null) : null;
     }
     return null;
   }
 
-  const isOld = (c) =>
+  const isOld = (c: Element) =>
     c.classList.contains('blob-num-deletion') ||
     c.getAttribute('data-diff-side') === 'left' ||
     c.getAttribute('data-split-side') === 'left';
 
   // Returns the line number in the PR's *new* version of the file.
-  function lineFor(cell) {
+  function lineFor(cell: Element): { line: number; approx: boolean } {
     if (cell.matches(THREAD_CELL)) return threadCellLine(cell);
     const row = cell.closest('tr');
     const cells = row ? [...row.querySelectorAll(LINE_CELL)] : [cell];
-    const own = parseInt(cell.getAttribute('data-line-number'), 10);
+    const own = parseInt(cell.getAttribute('data-line-number') ?? '', 10);
 
     // New React diff view: data-diff-side + data-diff-line-key="b:254-l:254-r:253"
     const side = cell.getAttribute('data-diff-side');
@@ -73,11 +77,11 @@
       if (side === 'right') return { line: own, approx: false };
       const r = (cell.getAttribute('data-diff-line-key') || '').match(/(?:^|-)r:(\d+)/);
       // Unchanged line shown on the left: the key gives its number in the new file
-      if (cell.classList.contains('diff-line-number-neutral') && r) return { line: +r[1], approx: false };
+      if (cell.classList.contains('diff-line-number-neutral') && r) return { line: +r[1]!, approx: false };
       // Deleted line: only exists in the old file → nearest line in the new file
-      const right = cells.find((c) => c.getAttribute('data-diff-side') === 'right' && /^\d+$/.test(c.getAttribute('data-line-number')));
-      if (right) return { line: parseInt(right.getAttribute('data-line-number'), 10), approx: true };
-      if (r) return { line: +r[1], approx: true };
+      const right = cells.find((c) => c.getAttribute('data-diff-side') === 'right' && /^\d+$/.test(c.getAttribute('data-line-number') ?? ''));
+      if (right) return { line: parseInt(right.getAttribute('data-line-number') ?? '', 10), approx: true };
+      if (r) return { line: +r[1]!, approx: true };
       return { line: own, approx: true };
     }
 
@@ -86,44 +90,44 @@
     const sideless = !cell.hasAttribute('data-split-side') && !cell.hasAttribute('data-diff-side');
     if (isOld(cell) || sideless) {
       const cands = cells.filter((c) => !isOld(c) && c.getAttribute('data-line-number'));
-      if (cands.length) target = cands[cands.length - 1];
+      if (cands.length) target = cands[cands.length - 1]!;
     }
-    const line = parseInt(target.getAttribute('data-line-number'), 10);
+    const line = parseInt(target.getAttribute('data-line-number') ?? '', 10);
     return { line, approx: isOld(target) || cell.classList.contains('blob-num-deletion') };
   }
 
   // Conversation snippet: one number column, or two (old, new) as on context lines.
   // Each slot is a number or null (empty column).
-  const rowSlots = (row) => [...row.querySelectorAll(THREAD_CELL)]
+  const rowSlots = (row: Element): (number | null)[] => [...row.querySelectorAll(THREAD_CELL)]
     .flatMap((c) => { const codes = [...c.querySelectorAll('code')]; return codes.length ? codes : [c]; })
     .flatMap((e) => { const nums = clean(e.textContent).match(/\d+/g); return nums ? nums.map(Number) : [null]; });
   // Two columns → the new-file one (last); one column → that number.
-  const rowNumber = (row) => {
+  const rowNumber = (row: Element): number | null => {
     const s = rowSlots(row);
-    return s.length ? s[s.length - 1] : null;
+    return s.length ? s[s.length - 1]! : null;
   };
   // A deleted line only has an old-file number: use the nearest non-deleted row (below first, then above).
-  const isDeletedRow = (row) => !!row.querySelector('code[class*="DeletionLine"]') ||
+  const isDeletedRow = (row: Element) => !!row.querySelector('code[class*="DeletionLine"]') ||
     (rowSlots(row).length >= 2 && rowNumber(row) == null);
-  function threadCellLine(cell) {
-    const row = cell.closest('tr');
-    if (!isDeletedRow(row)) return { line: rowNumber(row), approx: false };
-    const rows = [...row.closest('table').querySelectorAll('tr')].filter((r) => rowNumber(r) != null && !isDeletedRow(r));
+  function threadCellLine(cell: Element): { line: number; approx: boolean } {
+    const row = cell.closest('tr')!;
+    if (!isDeletedRow(row)) return { line: rowNumber(row) ?? 1, approx: false };
+    const rows = [...row.closest('table')!.querySelectorAll('tr')].filter((r) => rowNumber(r) != null && !isDeletedRow(r));
     const below = rows.find((r) => row.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING);
     const above = rows.filter((r) => row.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING).pop();
     const near = below || above;
-    return { line: near ? rowNumber(near) : rowNumber(row), approx: true };
+    return { line: (near ? rowNumber(near) : rowNumber(row)) ?? 1, approx: true };
   }
 
   // "Line 122" / "Lines 118 to 122" next to the file name of a review thread → commented line.
-  function threadHeaderLine(h2) {
-    const m = h2.textContent.match(/Lines?\s+(\d+)(?:\D+(\d+))?/);
-    return m ? parseInt(m[2] || m[1], 10) : 1;
+  function threadHeaderLine(h2: Element): number {
+    const m = (h2.textContent ?? '').match(/Lines?\s+(\d+)(?:\D+(\d+))?/);
+    return m ? parseInt(m[2] || m[1]!, 10) : 1;
   }
 
   // Line-number cell to use for an element inside a diff row.
-  function cellFor(el) {
-    if (!el || !el.closest) return null;
+  function cellFor(el: EventTarget | Element | null): Element | null {
+    if (!(el instanceof Element)) return null;
     const td = el.closest('td');
     if (td && td.matches(ANY_CELL)) return td;
     const row = el.closest('tr');
@@ -135,14 +139,14 @@
       const same = cells.find((c) => (c.getAttribute('data-split-side') || c.getAttribute('data-diff-side')) === side);
       if (same) return same;
     }
-    return cells[0];
+    return cells[0] ?? null;
   }
 
   // ---------- Opening ----------
 
-  function openUrl(url) {
+  function openUrl(url: string) {
     if (/^https?:\/\//i.test(url)) {
-      chrome.runtime.sendMessage({ type: 'http', url }, (res) => {
+      browser.runtime.sendMessage({ type: 'http', url }).then((res: any) => {
         if (!res || !res.ok) {
           toast(`IDE injoignable (${res?.status || res?.error || 'pas de réponse'}). L'IDE est-il lancé ? Vérifier l'URL du modèle personnalisé.`);
         }
@@ -158,14 +162,14 @@
     a.remove();
   }
 
-  function openFor(el, forcedLine) {
+  function openFor(el: Element, forcedLine?: number) {
     const repoI = repoInfo();
     const rel = filePathFor(el);
     if (!repoI || !rel) {
       toast('Impossible de trouver le chemin du fichier sur cette page.');
       return;
     }
-    let line = forcedLine;
+    let line: number | undefined = forcedLine;
     let approx = false;
     if (line == null) {
       const cell = cellFor(el);
@@ -194,13 +198,13 @@
   }
 
   // IntelliJ & co sans dossier local : serveur intégré de l'IDE, chemin relatif aux projets ouverts.
-  function openJetBrainsHttp({ rel, line, approx }) {
+  function openJetBrainsHttp({ rel, line, approx }: { rel: string; line: number; approx: boolean }) {
     const port = /^\d+$/.test(cfg.jbPort || '') ? cfg.jbPort : '63342';
-    const q = (file) => `http://localhost:${port}/api/file?file=${encodeURIComponent(file)}&line=${line}&column=1`;
+    const q = (file: string) => `http://localhost:${port}/api/file?file=${encodeURIComponent(file)}&line=${line}&column=1`;
     const urls = [];
     const parts = rel.split('/');
     for (let i = 0; i < parts.length - 1; i++) urls.push(q(parts.slice(i).join('/')));
-    chrome.runtime.sendMessage({ type: 'httpTry', urls }, (res) => {
+    browser.runtime.sendMessage({ type: 'httpTry', urls }).then((res: any) => {
       if (res && res.ok) {
         toast(`${approx ? '⚠︎ Ligne supprimée, position approximative · ' : ''}${rel}:${line}`);
       } else if (res && res.status === 404) {
@@ -213,14 +217,14 @@
 
   // ---------- UI ----------
 
-  let toastTimer;
-  function toast(msg, html = false) {
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  function toast(msg: string, html = false) {
     let t = document.getElementById('gh2ide-toast');
     if (!t) {
       t = document.createElement('div');
       t.id = 'gh2ide-toast';
       t.addEventListener('click', (e) => {
-        if (e.target.closest('[data-gh2ide-options]')) chrome.runtime.sendMessage({ type: 'options' });
+        if ((e.target as Element | null)?.closest('[data-gh2ide-options]')) browser.runtime.sendMessage({ type: 'options' });
       });
       document.body.appendChild(t);
     }
@@ -228,7 +232,7 @@
     else t.textContent = msg;
     t.style.display = 'block';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (t.style.display = 'none'), html ? 6000 : 2500);
+    toastTimer = setTimeout(() => (t!.style.display = 'none'), html ? 6000 : 2500);
   }
 
   const btn = document.createElement('button');
@@ -236,7 +240,7 @@
   btn.type = 'button';
   btn.textContent = '↗';
   btn.title = 'Ouvrir dans l\'IDE (ou Alt+clic sur la ligne)';
-  let hoverCell = null;
+  let hoverCell: Element | null = null;
   btn.addEventListener('mousedown', (e) => e.preventDefault());
   btn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -247,7 +251,7 @@
 
   // Masquage différé : en quittant la ligne, la souris traverse la marge (bordure du snippet,
   // padding) avant d'atteindre le bouton → on laisse le temps de l'atteindre.
-  let hideTimer;
+  let hideTimer: ReturnType<typeof setTimeout> | undefined;
   function hideBtnNow() {
     clearTimeout(hideTimer);
     btn.style.display = 'none';
@@ -285,7 +289,7 @@
   // Coche tracée (stroke) pour l'animer au dessin.
   const CHECK_ICON = '<svg class="i-check" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path pathLength="1" d="M2.75 8.75l3.5 3.5 7-7.5"/></svg>';
 
-  async function copyText(text) {
+  async function copyText(text: string) {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -303,7 +307,7 @@
   const tip = document.createElement('div');
   tip.id = 'gh2ide-tip';
   tip.setAttribute('role', 'tooltip');
-  function showTip(el, text) {
+  function showTip(el: Element, text: string) {
     tip.textContent = text;
     if (!tip.isConnected) document.body.appendChild(tip);
     tip.style.display = 'block';
@@ -320,7 +324,7 @@
   function pasteHint() {
     const quick = MAC ? '⌘P' : 'Ctrl+P';
     const jb = MAC ? '⌘⇧O' : 'Ctrl+Shift+N';
-    const hints = {
+    const hints: Record<string, [string, string]> = {
       vscode: [quick, 'VS Code'], insiders: [quick, 'VS Code Insiders'], cursor: [quick, 'Cursor'],
       windsurf: [quick, 'Windsurf'], vscodium: [quick, 'VSCodium'], zed: [quick, 'Zed'],
       androidstudio: [jb, 'Android Studio'], jetbrains: [jb, "l'IDE JetBrains"], xcode: ['⌘⇧O', 'Xcode'],
@@ -339,6 +343,7 @@
       b.className = 'gh2ide-copy';
       b.setAttribute('aria-label', 'Copier le chemin du fichier');
       b.innerHTML = COPY_ICON + CHECK_ICON;
+      let timer: ReturnType<typeof setTimeout> | undefined;
       b.addEventListener('mouseenter', () => showTip(b, b.classList.contains('done') ? pasteHint() : 'Copier le chemin'));
       b.addEventListener('mouseleave', hideTip);
       b.addEventListener('click', (e) => {
@@ -352,8 +357,8 @@
         void b.offsetWidth;
         b.classList.add('done');
         showTip(b, pasteHint());
-        clearTimeout(b._t);
-        b._t = setTimeout(() => { b.classList.remove('done'); if (b.matches(':hover')) showTip(b, 'Copier le chemin'); else hideTip(); }, 2000);
+        clearTimeout(timer);
+        timer = setTimeout(() => { b.classList.remove('done'); if (b.matches(':hover')) showTip(b, 'Copier le chemin'); else hideTip(); }, 2000);
       });
       h2.appendChild(b);
     }
@@ -376,7 +381,7 @@
       openFor(cell);
       return;
     }
-    const header = e.target.closest('h2, h3, .file-header, .file-info');
+    const header = (e.target as Element).closest('h2, h3, .file-header, .file-info');
     if (header && filePathFor(header)) {
       e.preventDefault();
       e.stopPropagation();
@@ -384,4 +389,5 @@
       openFor(header, isThread ? threadHeaderLine(header) : 1);
     }
   }, true);
-})();
+  },
+});

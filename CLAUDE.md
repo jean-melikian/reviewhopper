@@ -1,26 +1,26 @@
 # ReviewHopper - notes de passation
 
-Extension Chrome (Manifest V3, JS vanilla, aucun build) qui, sur une page de diff GitHub
+Extension navigateur (Manifest V3, TypeScript, [WXT](https://wxt.dev) 0.21) qui, sur une page de diff GitHub
 (PR « Files changed » / « Changes », commit), ouvre le fichier + la ligne dans l'IDE local.
-Éditeur par défaut : **VS Code** (`DEFAULTS.ide` dans `shared.js`). Android Studio / JetBrains via `idea://` (testé sur macOS), les autres via leur schéma d'URL.
+Éditeur par défaut : **VS Code** (`DEFAULTS.ide` dans `utils/ide.ts`). Android Studio / JetBrains via `idea://` (testé sur macOS), les autres via leur schéma d'URL.
 
-Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris par le paquet npm de justinloveless/github-to-ide, même usage). Le préfixe technique `gh2ide` (ids CSS, `GH2IDE`, `data-gh2ide-*`) est volontairement conservé ; le dossier s'appelle encore `gh-pr-to-ide` (le renommer change l'ID de l'extension non empaquetée et perd les réglages).
+Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris par le paquet npm de justinloveless/github-to-ide, même usage). Le préfixe technique `gh2ide` (ids CSS, `data-gh2ide-*`) est volontairement conservé. Depuis WXT (2026-11-18), l'extension se charge depuis `.output/chrome-mv3` : l'ID non empaqueté a changé une fois (réglages à ressaisir).
 
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `manifest.json` | MV3. Content script sur `https://github.com/*`, `host_permissions` localhost/127.0.0.1, page d'options, service worker. |
-| `shared.js` | Logique commune (chargée avant `content.js` et `options.js`, expose `globalThis.GH2IDE`) : `DEFAULTS`, résolution du dossier local (`resolveRoot`, `~` via `home`), construction du lien (`ideUrl`), parsing des correspondances, validation des chemins. |
-| `content.js` | Détection fichier/ligne, bouton ↗ au survol, Alt+clic, toasts. |
-| `content.css` | Style du bouton flottant `#gh2ide-btn` et du toast `#gh2ide-toast`. |
-| `background.js` | Ouvre les options (install / clic sur l'icône) ; fait les `fetch` vers le serveur local de l'IDE (messages `http` et `httpTry`). |
-| `options.html` / `options.js` | Réglages dans `chrome.storage.sync` : `ide`, `template`, `baseDir`, `mappings`, `home`, `hoverButton`, `jbPort`. Enregistrement automatique (400 ms), correspondances en tableau (sérialisées en texte `owner/repo = /chemin`, lignes `#` conservées, lignes au chemin invalide non enregistrées), validation des chemins, zone "Tester" (URL GitHub ou `owner/repo/chemin:ligne` → dossier, lien, bouton Ouvrir), mode sombre. |
+| `wxt.config.ts` | Manifest (généré par WXT) : permissions, `host_permissions` localhost/127.0.0.1, icônes ; MV3 forcé pour Firefox (WXT vise MV2 par défaut) avec `browser_specific_settings.gecko` (id `reviewhopper@jean-melikian.github.io`, Firefox 140+, `data_collection_permissions: none` exigé par AMO). |
+| `utils/ide.ts` | Logique commune (modules importés par le content script et les options) : `DEFAULTS`, types `Config`, résolution du dossier local (`resolveRoot`, `~` via `home`), construction du lien (`ideUrl`), parsing des correspondances, validation des chemins. |
+| `utils/config.ts` | `loadConfig` (storage.sync complété par `DEFAULTS`) / `saveConfig`. |
+| `entrypoints/content/` | `index.ts` : détection fichier/ligne, bouton ↗ au survol, Alt+clic, toasts, bouton de copie. `style.css` : styles injectés sur GitHub. |
+| `entrypoints/background.ts` | Ouvre les options (install / clic sur l'icône) ; fait les `fetch` vers le serveur local de l'IDE (messages `http` et `httpTry`). Service worker sur Chromium, script d'arrière-plan sur Firefox (géré par WXT). |
+| `entrypoints/options/` | `index.html` + `main.ts`. Réglages dans `storage.sync` : `ide`, `template`, `baseDir`, `mappings`, `home`, `hoverButton`, `jbPort`. Enregistrement automatique (400 ms), correspondances en tableau (sérialisées en texte `owner/repo = /chemin`, lignes `#` conservées, lignes au chemin invalide non enregistrées), validation des chemins, zone "Tester", mode sombre. |
 | `helpers/xcode/install.sh` | Installe / désinstalle l'app relais Xcode (`--uninstall`). `REVIEWHOPPER_APP` change l'emplacement, `REVIEWHOPPER_NO_REGISTER=1` construit sans enregistrer. |
-| `icons/` | Logo : bulle de commentaire de review avec lignes de diff (+, -, contexte) et pastille ↗ (saut vers l'IDE). Sources `icons/src/logo.svg` (32/48/128) et `logo-small.svg` (16, simplifié). PNG rendus avec Chrome headless (`--screenshot`, `--default-background-color=00000000`) d'une page contenant le SVG en `<img>`. |
+| `public/icons/`, `icons/src/` | Logo : bulle de commentaire de review avec lignes de diff (+, -, contexte) et pastille ↗ (saut vers l'IDE). Sources `icons/src/logo.svg` (32/48/128) et `logo-small.svg` (16, simplifié). PNG rendus avec Chrome headless (`--screenshot`, `--default-background-color=00000000`) d'une page contenant le SVG en `<img>`. |
 
-Installation : `chrome://extensions` → Mode développeur → « Charger l'extension non empaquetée » → ce dossier.
-Après modif : bouton ↻ sur la carte de l'extension **et** recharger l'onglet GitHub.
+Build : `npm run build` (Chromium : Chrome, Edge, Brave, Arc, Dia, Vivaldi) et `npm run build:firefox` (Firefox, Zen). Charger `.output/chrome-mv3` (non empaquetée) ou `.output/firefox-mv3/manifest.json` (about:debugging, temporaire). `npm run dev` recharge à chaud. API : `browser` de WXT (promesses), jamais `chrome.*` ni de callback (`sendMessage(...).then`), sinon Firefox casse.
+Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Firefox MV3, page de test reproduisant le DOM GitHub (lignes 660/661/14, copie, réglages). **Pas encore chargé dans un vrai Chrome ni Firefox.** `web-ext lint` non lancé (installation refusée en mode auto).
 
 ## Interaction
 
@@ -106,7 +106,7 @@ Settings › Tools › **Web Browsers and Preview** › Built-in Server : port *
   ouvert. `/api/about` répond 200. Inutile de creuser chemins absolus/relatifs.
 - Solution retenue : Android Studio enregistre le schéma **`idea://`** (Info.plist). 
   `idea://open?file=<abs encodé>&line=<n>` ouvre le fichier à la ligne `n` (base 1, validé à la main).
-  `ideUrl()` (`shared.js`) l'utilise dès qu'une racine locale est connue (`baseDir`/`mappings`) ; l'API HTTP
+  `ideUrl()` (`utils/ide.ts`) l'utilise dès qu'une racine locale est connue (`baseDir`/`mappings`) ; l'API HTTP
   reste en fallback sans racine (utile seulement pour d'autres IDE JetBrains).
 - Validation via l'extension (clic ↗ sur une vraie PR) **pas encore faite**.
 

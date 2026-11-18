@@ -4,9 +4,24 @@ Extension Chrome (Manifest V3) qui ouvre le fichier et la ligne d'un diff GitHub
 
 ## Installation
 
-1. Ouvrir `chrome://extensions` et activer le **Mode développeur**.
-2. **Charger l'extension non empaquetée** puis choisir le dossier de l'extension.
-3. La page de réglages s'ouvre : choisir l'éditeur et indiquer où se trouvent les clones locaux.
+Navigateurs : Chrome, Edge, Brave, Arc, Dia, Vivaldi (build Chromium) ; Firefox et Zen (build Firefox).
+
+```bash
+npm install
+npm run build          # Chromium : .output/chrome-mv3
+npm run build:firefox  # Firefox / Zen : .output/firefox-mv3
+```
+
+- **Chromium** : `chrome://extensions` (ou `edge://extensions`, `brave://extensions`…), activer le **Mode développeur**, **Charger l'extension non empaquetée** puis choisir `.output/chrome-mv3`.
+- **Firefox / Zen** : `about:debugging#/runtime/this-firefox`, **Charger un module complémentaire temporaire** puis choisir `.output/firefox-mv3/manifest.json` (retiré au redémarrage du navigateur tant que l'extension n'est pas signée par Mozilla).
+
+La page de réglages s'ouvre : choisir l'éditeur et indiquer où se trouvent les clones locaux.
+
+## Développement
+
+- `npm run dev` / `npm run dev:firefox` : navigateur de test avec rechargement automatique.
+- `npm run compile` : vérification TypeScript.
+- `npm run zip` / `npm run zip:firefox` : archives pour le Chrome Web Store, Edge Add-ons et addons.mozilla.org (plus l'archive des sources demandée par Mozilla, reconstruite avec `npm install` puis `npm run zip:firefox`).
 
 ## Utilisation
 
