@@ -26,10 +26,10 @@ Enregistrés automatiquement.
 
 Android Studio / IntelliJ : ouverture via le lien `idea://open` enregistré par l'IDE. Chrome demande une confirmation au premier clic.
 
-Xcode : il n'a pas de lien pour ouvrir un fichier à une ligne. Installer une fois l'app relais (macOS, Xcode installé) depuis le dossier de l'extension :
+Xcode : il n'a pas de lien pour ouvrir un fichier à une ligne. Installer une fois l'app relais (macOS, Xcode installé) :
 
 ```bash
-bash helpers/xcode/install.sh
+brew install --cask jean-melikian/tap/reviewhopper-xcode
 ```
 
-Elle crée `~/Applications/ReviewHopper Xcode.app`, qui reçoit les liens `reviewhopper-xcode://` et lance `xed --line`. Désinstaller : `bash helpers/xcode/install.sh --uninstall`.
+Elle crée `~/Applications/ReviewHopper Xcode.app`, qui reçoit les liens `reviewhopper-xcode://` et lance `xed --line`. Désinstaller : `brew uninstall --cask reviewhopper-xcode`. Sans Homebrew : `bash helpers/xcode/install.sh` (et `--uninstall`) depuis le dossier de l'extension.

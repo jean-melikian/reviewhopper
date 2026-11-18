@@ -16,7 +16,7 @@ Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris p
 | `content.css` | Style du bouton flottant `#gh2ide-btn` et du toast `#gh2ide-toast`. |
 | `background.js` | Ouvre les options (install / clic sur l'icône) ; fait les `fetch` vers le serveur local de l'IDE (messages `http` et `httpTry`). |
 | `options.html` / `options.js` | Réglages dans `chrome.storage.sync` : `ide`, `template`, `baseDir`, `mappings`, `home`, `hoverButton`, `jbPort`. Enregistrement automatique (400 ms), correspondances en tableau (sérialisées en texte `owner/repo = /chemin`, lignes `#` conservées, lignes au chemin invalide non enregistrées), validation des chemins, zone "Tester" (URL GitHub ou `owner/repo/chemin:ligne` → dossier, lien, bouton Ouvrir), mode sombre. |
-| `helpers/xcode/install.sh` | Installe / désinstalle l'app relais Xcode (`--uninstall`). |
+| `helpers/xcode/install.sh` | Installe / désinstalle l'app relais Xcode (`--uninstall`). `REVIEWHOPPER_APP` change l'emplacement, `REVIEWHOPPER_NO_REGISTER=1` construit sans enregistrer. |
 | `icons/` | Logo : bulle de commentaire de review avec lignes de diff (+, -, contexte) et pastille ↗ (saut vers l'IDE). Sources `icons/src/logo.svg` (32/48/128) et `logo-small.svg` (16, simplifié). PNG rendus avec Chrome headless (`--screenshot`, `--default-background-color=00000000`) d'une page contenant le SVG en `<img>`. |
 
 Installation : `chrome://extensions` → Mode développeur → « Charger l'extension non empaquetée » → ce dossier.
@@ -86,6 +86,11 @@ Après modif : bouton ↻ sur la carte de l'extension **et** recharger l'onglet 
   un fichier existant et une ligne numérique, puis `exec xed --line`. Info.plist : `CFBundleURLTypes`
   `reviewhopper-xcode`, `LSUIElement`, re-signature ad hoc, `lsregister -f`. Lien :
   `reviewhopper-xcode://open?file=<abs encodé>&line=<n>` (validé : chemin avec espace et accents, ligne 30).
+- **Distribution Homebrew** : dépôts publics `jean-melikian/reviewhopper` (tag `v0.1.0`) et `jean-melikian/homebrew-tap`,
+  cask `Casks/reviewhopper-xcode.rb` : `installer script` lance `install.sh` depuis l'archive du tag, `uninstall script`
+  avec `--uninstall`. L'app est construite sur la machine, donc pas de quarantaine Gatekeeper. Une **formule** a été
+  essayée puis abandonnée : le bac à sable de `post_install` fait échouer `lsregister` (-10822). Nouvelle version :
+  tag + release, puis `version` et `sha256` (archive `archive/refs/tags/vX.tar.gz`) dans le cask.
 - Modèle personnalisé : variables `{abs} {absUri} {absEnc} {rel} {root} {line} {line0} {col} {owner} {repo}` ;
   un modèle `http(s)://` est appelé via le service worker au lieu d'être ouvert.
 

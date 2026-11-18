@@ -102,11 +102,12 @@
     <div id="xcodeBox" class="hint">
       Xcode n'a pas de lien pour ouvrir un fichier à une ligne : installer une fois la petite app relais
       <i>ReviewHopper Xcode</i> (dans <code>~/Applications</code>), qui lance <code>xed --line</code>.
-      Depuis le dossier de l'extension, dans un terminal :
-      <div class="row"><code id="xcodeCmd">bash helpers/xcode/install.sh</code>
+      Dans un terminal (Homebrew) :
+      <div class="row"><code id="xcodeCmd">brew install --cask jean-melikian/tap/reviewhopper-xcode</code>
       <button class="btn" id="xcodeCopy" type="button">Copier</button></div>
       Chrome demande une confirmation au premier clic (cocher "Toujours autoriser"). Le dossier local du dépôt
-      est indispensable (étape 2). Désinstaller : <code>bash helpers/xcode/install.sh --uninstall</code>.
+      est indispensable (étape 2). Désinstaller : <code>brew uninstall --cask reviewhopper-xcode</code>.
+      Sans Homebrew : <code>bash helpers/xcode/install.sh</code> depuis le dossier de l'extension.
     </div>
 
     <div id="jbBox">
