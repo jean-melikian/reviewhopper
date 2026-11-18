@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>ReviewHopper : réglages</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --fg: #1f2328; --muted: #59636e; --bg: #ffffff; --panel: #f6f8fa; --border: #d0d7de;
+      --accent: #0969da; --ok: #1a7f37; --warn: #9a6700; --err: #cf222e; --btn: #1f883d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --fg: #e6edf3; --muted: #9198a1; --bg: #0d1117; --panel: #151b23; --border: #3d444d;
+        --accent: #4493f8; --ok: #3fb950; --warn: #d29922; --err: #f85149; --btn: #238636;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; color: var(--fg); background: var(--bg); }
+    header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    h1 { font-size: 20px; margin: 0; }
+    .sub { color: var(--muted); margin: 4px 0 0; }
+    #status { font-size: 12px; color: var(--muted); min-height: 18px; transition: color .2s; }
+    #status.ok { color: var(--ok); }
+    section { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 20px; }
+    h2 { font-size: 15px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+    h2 .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--panel); border: 1px solid var(--border); font-size: 12px; }
+    .desc { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+    label.field { display: block; font-weight: 600; margin: 14px 0 6px; }
+    input[type=text], select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    select { font-family: inherit; font-size: 14px; }
+    input.bad { border-color: var(--err); }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .msg { font-size: 12px; margin-top: 4px; }
+    .msg.err { color: var(--err); } .msg.warn { color: var(--warn); } .msg.ok { color: var(--ok); }
+    code { background: var(--panel); padding: 1px 4px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+    .usage { background: var(--panel); border-radius: 8px; padding: 12px 16px; margin-top: 20px; }
+    .usage ul { margin: 6px 0 0; padding-left: 18px; }
+    kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 12px; background: var(--bg); }
+    .maps { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; gap: 6px 8px; align-items: start; }
+    .maps .head { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .maps .msg { grid-column: 1 / -1; margin: -2px 0 4px; }
+    button { font: inherit; border-radius: 6px; cursor: pointer; }
+    .btn { padding: 5px 12px; border: 1px solid var(--border); background: var(--panel); color: var(--fg); }
+    .btn:hover { border-color: var(--muted); }
+    .btn.primary { background: var(--btn); border-color: var(--btn); color: #fff; font-weight: 600; }
+    .icon { width: 32px; height: 32px; border: 1px solid transparent; background: none; color: var(--muted); font-size: 16px; }
+    .icon:hover { color: var(--err); border-color: var(--border); }
+    .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .row input[type=text] { flex: 1 1 220px; width: auto; }
+    .check { display: flex; align-items: center; gap: 8px; }
+    .result { margin-top: 10px; font-size: 13px; }
+    .result div { margin-top: 4px; }
+    #customBox, #jbBox, #asBox, #xcodeBox { display: none; }
+    details summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+    @media (max-width: 520px) {
+      .maps { grid-template-columns: minmax(0, 1fr) auto; }
+      .maps .path { grid-column: 1 / 2; }
+      .maps .head:nth-child(2) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>ReviewHopper</h1>
+      <p class="sub">Ouvre le fichier et la ligne d'un diff GitHub dans l'éditeur local.</p>
+    </div>
+    <div id="status" aria-live="polite"></div>
+  </header>
+
+  <div class="usage">
+    <b>Utilisation</b>
+    <ul>
+      <li>Onglet <b>Files changed</b> d'une PR ou page de commit : survoler une ligne puis cliquer sur <b>↗</b>, ou <kbd>⌥</kbd>+clic sur la ligne.</li>
+      <li>Onglet <b>Conversation</b> : même chose sur l'extrait de code d'un commentaire ; <kbd>⌥</kbd>+clic sur le nom du fichier ouvre la ligne commentée ; le bouton de copie à côté copie le chemin du fichier (à coller dans la recherche de fichiers de l'éditeur).</li>
+      <li><kbd>⌥</kbd>+clic sur le nom d'un fichier dans le diff : ouvre le fichier à la ligne 1.</li>
+    </ul>
+  </div>
+
+  <section>
+    <h2><span class="n">1</span>Éditeur</h2>
+    <select id="ide" aria-label="Éditeur">
+      <option value="vscode">VS Code</option>
+      <option value="androidstudio">Android Studio</option>
+      <option value="jetbrains">IntelliJ IDEA / autre IDE JetBrains</option>
+      <option value="xcode">Xcode</option>
+      <option value="insiders">VS Code Insiders</option>
+      <option value="cursor">Cursor</option>
+      <option value="windsurf">Windsurf</option>
+      <option value="vscodium">VSCodium</option>
+      <option value="zed">Zed</option>
+      <option value="custom">Personnalisé (modèle d'URL)</option>
+    </select>
+
+    <div id="asBox" class="hint">
+      Ouverture via le lien <code>idea://open</code> enregistré par l'IDE : Chrome demande une confirmation au premier clic
+      (cocher "Toujours autoriser"). Le dossier local du dépôt est indispensable (étape 2).
+    </div>
+
+    <div id="xcodeBox" class="hint">
+      Xcode n'a pas de lien pour ouvrir un fichier à une ligne : installer une fois la petite app relais
+      <i>ReviewHopper Xcode</i> (dans <code>~/Applications</code>), qui lance <code>xed --line</code>.
+      Depuis le dossier de l'extension, dans un terminal :
+      <div class="row"><code id="xcodeCmd">bash helpers/xcode/install.sh</code>
+      <button class="btn" id="xcodeCopy" type="button">Copier</button></div>
+      Chrome demande une confirmation au premier clic (cocher "Toujours autoriser"). Le dossier local du dépôt
+      est indispensable (étape 2). Désinstaller : <code>bash helpers/xcode/install.sh --uninstall</code>.
+    </div>
+
+    <div id="jbBox">
+      <div class="hint">
+        Avec un dossier local : lien <code>idea://open</code>. Sans dossier : serveur intégré de l'IDE
+        (<i>Settings › Tools › Web Browsers and Preview › Built-in Server</i>, cocher <b>Allow unsigned requests</b>).
+      </div>
+      <label class="field" for="jbPort">Port du serveur intégré</label>
+      <input type="text" id="jbPort" inputmode="numeric" placeholder="63342">
+    </div>
+
+    <div id="customBox">
+      <label class="field" for="template">Modèle d'URL</label>
+      <input type="text" id="template" placeholder="subl://open?url=file://{absUri}&amp;line={line}">
+      <div class="hint">
+        Variables : <code>{abs}</code> <code>{absUri}</code> <code>{absEnc}</code> <code>{rel}</code> <code>{root}</code>
+        <code>{line}</code> <code>{line0}</code> (à partir de 0) <code>{col}</code> <code>{owner}</code> <code>{repo}</code>.
+        Une URL <code>http://localhost…</code> est appelée en arrière-plan au lieu d'être ouverte.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Emplacement des dépôts</h2>
+    <p class="desc">Où se trouvent les clones locaux. Les dépôts listés ici passent avant le dossier par défaut.</p>
+
+    <div class="maps" id="maps">
+      <div class="head">Dépôt GitHub</div>
+      <div class="head">Dossier local</div>
+      <div></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="addMap" type="button">+ Ajouter un dépôt</button>
+    </div>
+    <div class="hint">Dépôt : <code>owner/repo</code> ou <code>repo</code>. Dossier : chemin absolu (<code>~</code> accepté si le dossier personnel est connu, voir plus bas).</div>
+
+    <label class="field" for="baseDir">Dossier par défaut (facultatif)</label>
+    <input type="text" id="baseDir" placeholder="/Users/moi/dev/{repo}">
+    <div class="msg" id="baseDirMsg"></div>
+    <div class="hint"><code>{owner}</code> et <code>{repo}</code> sont remplacés ; sans variable, le nom du dépôt est ajouté à la fin.</div>
+
+    <details style="margin-top:12px">
+      <summary>Dossier personnel (pour <code>~</code>)</summary>
+      <label class="field" for="home">Dossier personnel</label>
+      <input type="text" id="home" placeholder="/Users/moi">
+      <div class="hint">Remplace un <code>~</code> en début de chemin. Rempli automatiquement si un chemin absolu sous <code>/Users/&lt;nom&gt;</code> est saisi.</div>
+    </details>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Tester</h2>
+    <p class="desc">Coller une URL GitHub (PR, commit, fichier) ou un chemin <code>owner/repo/chemin/du/fichier</code>.</p>
+    <div class="row">
+      <input type="text" id="testInput" placeholder="https://github.com/acme/mon-app/blob/main/src/App.kt#L42">
+      <button class="btn primary" id="testOpen" type="button">Ouvrir</button>
+    </div>
+    <div class="result" id="testResult"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Affichage</h2>
+    <div class="check">
+      <input type="checkbox" id="hoverButton">
+      <label for="hoverButton">Afficher le bouton ↗ au survol des lignes (sinon <kbd>⌥</kbd>+clic uniquement)</label>
+    </div>
+  </section>
+
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

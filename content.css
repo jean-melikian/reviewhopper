@@ -1,0 +1,121 @@
+#gh2ide-btn {
+  position: fixed;
+  z-index: 2147483000;
+  display: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 4px;
+  background: var(--bgColor-default, #fff);
+  color: var(--fgColor-accent, #0969da);
+  font: 600 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+#gh2ide-btn:hover {
+  background: var(--fgColor-accent, #0969da);
+  color: #fff;
+}
+#gh2ide-toast {
+  position: fixed;
+  z-index: 2147483001;
+  right: 16px;
+  bottom: 16px;
+  max-width: 420px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #24292f;
+  color: #fff;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+#gh2ide-toast a {
+  color: #58a6ff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.gh2ide-copy {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 6px;
+  padding: 0;
+  vertical-align: middle;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fgColor-muted, #59636e);
+  cursor: pointer;
+  transition: background-color .15s, color .2s;
+}
+.gh2ide-copy:hover {
+  background: var(--bgColor-neutral-muted, rgba(129, 139, 152, 0.15));
+  color: var(--fgColor-default, #1f2328);
+}
+.gh2ide-copy:active { transform: scale(.9); }
+.gh2ide-copy svg {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), opacity .2s;
+}
+/* Morphing : la copie tourne et rétrécit, la coche se dessine en rebondissant. */
+.gh2ide-copy .i-check { opacity: 0; transform: scale(.4) rotate(-45deg); }
+.gh2ide-copy .i-check path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.gh2ide-copy.done,
+.gh2ide-copy.done:hover { color: var(--fgColor-success, #1a7f37); }
+.gh2ide-copy.done .i-copy { opacity: 0; transform: scale(.3) rotate(90deg); }
+.gh2ide-copy.done .i-check { opacity: 1; transform: none; }
+.gh2ide-copy.done .i-check path { animation: gh2ide-draw .35s .08s ease-out forwards; }
+/* Onde verte qui part du bouton. */
+.gh2ide-copy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--fgColor-success, #1a7f37);
+  opacity: 0;
+  pointer-events: none;
+}
+.gh2ide-copy.done::after { animation: gh2ide-ring .5s ease-out; }
+@keyframes gh2ide-draw { to { stroke-dashoffset: 0; } }
+@keyframes gh2ide-ring {
+  from { opacity: .6; transform: scale(.5); }
+  to { opacity: 0; transform: scale(1.6); }
+}
+#gh2ide-tip {
+  position: fixed;
+  z-index: 2147483002;
+  display: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bgColor-emphasis, #25292e);
+  color: var(--fgColor-onEmphasis, #fff);
+  font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: gh2ide-tip-in .15s ease-out;
+}
+@keyframes gh2ide-tip-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gh2ide-copy svg, .gh2ide-copy { transition: none; }
+  .gh2ide-copy.done .i-check path { animation: none; stroke-dashoffset: 0; }
+  .gh2ide-copy.done::after, #gh2ide-tip { animation: none; }
+}
+#gh2ide-tip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: inherit;
+  transform: rotate(45deg);
+}
