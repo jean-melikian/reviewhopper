@@ -88,7 +88,7 @@ brew install --cask jean-melikian/tap/reviewhopper-xcode
 
 ### Updating the extension
 
-- **Chromium**: replace the contents of the step 2 folder with the new zip's contents, click ↻ on the extension card, then reload your GitHub tabs. Keeping the same folder keeps your settings: loading another folder creates a new extension, without settings.
+- **Chromium**: remove the old version from the extensions page, load the new unzipped folder, then reload your GitHub tabs. Settings are kept: every build (release, PR test build, local build) has the same extension ID. Builds from before 1.3.0 had a folder-dependent ID: their settings have to be entered once more.
 - **Firefox**: load the new zip as in step 2.
 
 ## Usage
@@ -180,7 +180,8 @@ Other commands:
 - `npm run dev` / `npm run dev:firefox`: test browser with live reload.
 - `npm run compile`: TypeScript check.
 - `npm run screenshots`: regenerate the README screenshots (headless Chrome, after `npm run build`).
-- `npm run zip` / `npm run zip:firefox`: store archives (Chrome Web Store, Edge Add-ons, addons.mozilla.org), plus the source archive Mozilla requires.
+- `npm run zip` / `npm run zip:firefox`: release archives, plus the source archive Mozilla requires.
+- `npm run zip:store`: Chrome archive without the `key` field (refused by the Chrome Web Store, which assigns its own ID).
 
 ## Releasing
 

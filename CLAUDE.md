@@ -4,7 +4,7 @@ Extension navigateur (Manifest V3, TypeScript, [WXT](https://wxt.dev) 0.21) qui,
 (PR « Files changed » / « Changes », commit), ouvre le fichier + la ligne dans l'IDE local.
 Éditeur par défaut : **VS Code** (`DEFAULTS.ide` dans `utils/ide.ts`). Android Studio / JetBrains via `idea://` (testé sur macOS), les autres via leur schéma d'URL.
 
-Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris par le paquet npm de justinloveless/github-to-ide, même usage). Le préfixe technique `gh2ide` (ids CSS, `data-gh2ide-*`) est volontairement conservé. Depuis WXT (2026-11-18), l'extension se charge depuis `.output/chrome-mv3` : l'ID non empaqueté a changé une fois (réglages à ressaisir).
+Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris par le paquet npm de justinloveless/github-to-ide, même usage). Le préfixe technique `gh2ide` (ids CSS, `data-gh2ide-*`) est volontairement conservé. **ID Chrome figé** (2026-11-20) par le champ `key` (clé publique, `wxt.config.ts`) : `gohgmgkpeooiholmejldmdkfjdbbnhkj` pour tout build non empaqueté (release, build de PR, local), donc mêmes réglages `storage.sync` quel que soit le dossier. Avant, l'ID dépendait du chemin du dossier. Clé privée jetée (inutile sans .crx). Le Chrome Web Store refuse `key` : `npm run zip:store` (`REVIEWHOPPER_STORE=1`). Firefox : l'id gecko fixe déjà l'identité.
 
 ## Fichiers
 
