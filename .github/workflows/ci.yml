@@ -16,6 +16,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      chrome-url: ${{ steps.chrome.outputs.artifact-url }}
+      firefox-url: ${{ steps.firefox.outputs.artifact-url }}
+      suffix: ${{ steps.name.outputs.suffix }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -41,11 +45,13 @@ jobs:
             echo "suffix=main-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/upload-artifact@v4
+        id: chrome
         with:
           name: reviewhopper-chrome-${{ steps.name.outputs.suffix }}
           path: .output/chrome-mv3
           retention-days: 14
       - uses: actions/upload-artifact@v4
+        id: firefox
         with:
           name: reviewhopper-firefox-${{ steps.name.outputs.suffix }}
           path: .output/firefox-mv3
@@ -59,20 +65,41 @@ jobs:
           - **Firefox** (\`reviewhopper-firefox-${{ steps.name.outputs.suffix }}\`) : \`about:debugging#/runtime/this-firefox\`, **Charger un module complémentaire temporaire**, choisir le zip téléchargé.
           EOF
 
-  # Commentaire sur la PR avec le lien vers les builds (PR du dépôt uniquement : une PR venant
-  # d'un fork n'a pas le droit d'écrire).
-  comment:
+  # Liens directs vers les builds en tête de la description de la PR (bloc entre marqueurs, remplacé à
+  # chaque run). PR du dépôt uniquement : une PR venant d'un fork n'a pas le droit d'écrire.
+  links:
     needs: build
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
-      - name: Lien vers les builds de test
+      - name: Liens vers les builds de test
         env:
           GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHROME_URL: ${{ needs.build.outputs.chrome-url }}
+          FIREFOX_URL: ${{ needs.build.outputs.firefox-url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          body="**Builds de test** pour ${HEAD_SHA::7} : [artefacts Chrome et Firefox]($RUN_URL#artifacts) (14 jours). Mode d'emploi dans le résumé du run."
-          gh pr comment ${{ github.event.number }} -R "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
+          block=$(cat <<EOF
+          <!-- reviewhopper-builds:start -->
+          > **Builds de test** (commit ${HEAD_SHA::7}, gardés 14 jours, connexion GitHub requise)
+          > - Chrome, Edge, Brave, Arc, Dia : [télécharger]($CHROME_URL), décompresser, puis \`chrome://extensions\` > Mode développeur > Charger l'extension non empaquetée.
+          > - Firefox, Zen : [télécharger]($FIREFOX_URL), puis \`about:debugging#/runtime/this-firefox\` > Charger un module complémentaire temporaire > choisir le zip.
+          >
+          > [Détail du build]($RUN_URL)
+          <!-- reviewhopper-builds:end -->
+          EOF
+          )
+          gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json body -q .body > body.md
+          python3 - "$block" <<'PY2'
+          import re, sys
+          block = sys.argv[1].strip()
+          body = open('body.md').read()
+          pat = re.compile(r'<!-- reviewhopper-builds:start -->.*?<!-- reviewhopper-builds:end -->', re.S)
+          body = pat.sub(lambda m: block, body) if pat.search(body) else block + '\n\n' + body
+          open('body.md', 'w').write(body)
+          PY2
+          gh pr edit "$PR" -R "$GITHUB_REPOSITORY" --body-file body.md
