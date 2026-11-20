@@ -190,7 +190,7 @@ Autres commandes :
 3. Le workflow `Release` vérifie que le tag et `package.json` concordent, construit, lint le build Firefox, puis crée la release GitHub avec les zips Chrome, Firefox et sources (plus `SHA256SUMS.txt`).
 4. Si `helpers/xcode/` a changé : reporter dans le cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`) les `version` et `sha256` affichés dans le résumé du workflow.
 
-Le workflow `CI` vérifie les types et les deux builds à chaque push sur `main` et à chaque PR.
+Le workflow `CI` vérifie les types et les deux builds à chaque push sur `main` et à chaque PR. Sur une PR, il joint aussi des builds de test (Chrome et Firefox, gardés 14 jours) et commente le lien sur la PR : télécharger, puis charger comme à l'[étape 2](#2-lajouter-au-navigateur).
 
 ## Licence
 

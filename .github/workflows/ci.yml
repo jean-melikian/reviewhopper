@@ -25,3 +25,49 @@ jobs:
         run: npx --yes web-ext@8 lint --source-dir .output/firefox-mv3
       - name: Vérifier le script de l'app relais Xcode
         run: bash -n helpers/xcode/install.sh
+
+      # Builds à tester, attachés au run (téléchargeables depuis l'onglet Checks de la PR).
+      - name: Nom des builds
+        id: name
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            echo "suffix=pr${{ github.event.number }}-$(echo ${{ github.event.pull_request.head.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=main-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewhopper-chrome-${{ steps.name.outputs.suffix }}
+          path: .output/chrome-mv3
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewhopper-firefox-${{ steps.name.outputs.suffix }}
+          path: .output/firefox-mv3
+          retention-days: 14
+      - name: Mode d'emploi
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Tester ce build
+          Télécharger l'artefact en bas de cette page (connexion GitHub requise).
+          - **Chromium** (\`reviewhopper-chrome-${{ steps.name.outputs.suffix }}\`) : décompresser, puis \`chrome://extensions\`, Mode développeur, **Charger l'extension non empaquetée**.
+          - **Firefox** (\`reviewhopper-firefox-${{ steps.name.outputs.suffix }}\`) : \`about:debugging#/runtime/this-firefox\`, **Charger un module complémentaire temporaire**, choisir le zip téléchargé.
+          EOF
+
+  # Commentaire sur la PR avec le lien vers les builds (PR du dépôt uniquement : une PR venant
+  # d'un fork n'a pas le droit d'écrire).
+  comment:
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Lien vers les builds de test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="**Builds de test** pour ${HEAD_SHA::7} : [artefacts Chrome et Firefox]($RUN_URL#artifacts) (14 jours). Mode d'emploi dans le résumé du run."
+          gh pr comment ${{ github.event.number }} -R "$GITHUB_REPOSITORY" --edit-last --create-if-none --body "$body"
