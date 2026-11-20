@@ -17,6 +17,7 @@ Extension navigateur qui ouvre dans l'éditeur local le fichier et la ligne d'un
 - [Dépannage](#dépannage)
 - [Build depuis les sources](#build-depuis-les-sources)
 - [Publier une version](#publier-une-version)
+- [Licence](#licence)
 
 ## Démarrage rapide
 
@@ -174,3 +175,7 @@ Autres commandes :
 4. Si `helpers/xcode/` a changé : reporter dans le cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`) les `version` et `sha256` affichés dans le résumé du workflow.
 
 Le workflow `CI` vérifie les types et les deux builds à chaque push sur `main` et à chaque PR.
+
+## Licence
+
+[MIT](LICENSE)

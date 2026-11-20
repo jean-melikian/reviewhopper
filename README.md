@@ -19,6 +19,7 @@ Browser extension that opens the file and line of a GitHub review in your local 
 - [Troubleshooting](#troubleshooting)
 - [Build from source](#build-from-source)
 - [Releasing](#releasing)
+- [License](#license)
 
 ## Quick setup
 
@@ -178,3 +179,7 @@ Other commands:
 4. If `helpers/xcode/` changed: copy the `version` and `sha256` shown in the workflow summary into the cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`).
 
 The `CI` workflow checks types and both builds on every push to `main` and every PR.
+
+## License
+
+[MIT](LICENSE)
