@@ -57,22 +57,34 @@ export function resolveRoot(cfg: Config, owner: string, repo: string): { root: s
   const base = expandHome((cfg.baseDir || '').trim(), cfg.home);
   if (!base) return null;
   const root = /\{(repo|owner)\}/.test(base)
-    ? base.replace(/\{owner\}/g, owner).replace(/\{repo\}/g, repo)
+    ? base.replace(/\{owner\}/g, owner).replace(/\{repo\}/g, () => repo)
     : base.replace(/[\\/]+$/, '') + '/' + repo;
   return { root, from: 'dossier par défaut' };
 }
 
 export const localRoot = (cfg: Config, owner: string, repo: string) => resolveRoot(cfg, owner, repo)?.root || null;
 
-// URL that opens rel:line in the IDE, or null (no root / empty template).
+// Chemin relatif au dépôt lu dans la page, ou null s'il est suspect : un commentaire de PR ne doit pas
+// pouvoir faire ouvrir (ou copier) un fichier hors du dépôt.
+export function safeRel(rel: string | null | undefined): string | null {
+  if (!rel) return null;
+  if (/^[\\/]|^[A-Za-z]:|\\|[\u0000-\u001f\u007f]/.test(rel)) return null;
+  if (rel.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')) return null;
+  return rel;
+}
+
+// Encode chaque segment (#, ?, & compris) en gardant les / et un lecteur Windows "C:".
+const encodePath = (p: string) => p.split('/').map((seg) => (/^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg))).join('/');
+
+// URL that opens rel:line in the IDE, or null (no root / empty template / suspicious path).
 export function ideUrl(
   cfg: Config,
   { root, rel, line, owner, repo }: { root: string | null; rel: string; line: number; owner: string; repo: string },
 ): string | null {
-  if (!root) return null;
+  if (!root || !safeRel(rel)) return null;
   const rootPosix = root.replace(/\\/g, '/').replace(/\/+$/, '');
   const abs = `${rootPosix}/${rel}`;
-  const absUri = encodeURI(abs.startsWith('/') ? abs : '/' + abs); // "/C:/..." on Windows
+  const absUri = encodePath(abs.startsWith('/') ? abs : '/' + abs); // "/C:/..." on Windows
   const col = 1;
 
   // Android Studio n'expose pas /api/file (404, vérifié en 2026.2.2) : schéma idea:// (ligne en base 1).
@@ -83,16 +95,16 @@ export function ideUrl(
   const tpl = (cfg.template || '').trim();
   if (!tpl) return null;
   return tpl
-    .replace(/\{abs\}/g, abs)
-    .replace(/\{absUri\}/g, absUri)
-    .replace(/\{absEnc\}/g, encodeURIComponent(abs))
-    .replace(/\{rel\}/g, rel)
-    .replace(/\{root\}/g, rootPosix)
-    .replace(/\{line0\}/g, String(line - 1))
-    .replace(/\{line\}/g, String(line))
-    .replace(/\{col\}/g, String(col))
-    .replace(/\{owner\}/g, owner)
-    .replace(/\{repo\}/g, repo);
+    .replace(/\{abs\}/g, () => abs)
+    .replace(/\{absUri\}/g, () => absUri)
+    .replace(/\{absEnc\}/g, () => encodeURIComponent(abs))
+    .replace(/\{rel\}/g, () => rel)
+    .replace(/\{root\}/g, () => rootPosix)
+    .replace(/\{line0\}/g, () => String(line - 1))
+    .replace(/\{line\}/g, () => String(line))
+    .replace(/\{col\}/g, () => String(col))
+    .replace(/\{owner\}/g, () => owner)
+    .replace(/\{repo\}/g, () => repo);
 }
 
 // "" | {level, text} for a local path typed in the options.

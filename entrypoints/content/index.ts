@@ -1,5 +1,5 @@
 import './style.css';
-import { DEFAULTS, localRoot, ideUrl, type Config } from '@/utils/ide';
+import { DEFAULTS, localRoot, ideUrl, safeRel, type Config } from '@/utils/ide';
 import { loadConfig } from '@/utils/config';
 
 export default defineContentScript({
@@ -17,6 +17,12 @@ export default defineContentScript({
   const THREAD_CELL = 'td[class*="diffLineNumber"]';
   const ANY_CELL = `${LINE_CELL}, ${THREAD_CELL}`;
   const THREAD_LINK = 'h2 a[href*="#r"]';
+  // Vrai en-tête de fil de review : lien vers ".../pull/<n>/changes#r<id>" (ou /files), hors du corps
+  // d'un commentaire (un "## [chemin](...#r1)" en markdown ne doit pas passer pour un en-tête).
+  const isThreadLink = (a: Element) =>
+    /\/pull\/\d+\/(changes|files)#r\d+$/.test(a.getAttribute('href') ?? '') &&
+    !a.closest('.markdown-body, .comment-body, [class*="markdown"]');
+  const threadLinks = (root: ParentNode) => [...root.querySelectorAll(THREAD_LINK)].filter(isThreadLink);
   const HASH_ID = /^diff-[0-9a-f]{64}$/;
   const clean = (s: string | null | undefined) => (s ?? '').replace(/[\u200e\u200f\u202a-\u202e]/g, '').trim();
 
@@ -38,7 +44,7 @@ export default defineContentScript({
       }
       // Conversation tab: review thread <article> with an <h2><a href="…/changes#r<id>">path</a>
       if (p.tagName === 'ARTICLE') {
-        const links = [...p.querySelectorAll(THREAD_LINK)];
+        const links = threadLinks(p);
         const paths = new Set(links.map((a) => clean(a.textContent)));
         if (paths.size === 1) return [...paths][0]!;
       }
@@ -74,7 +80,13 @@ export default defineContentScript({
     // New React diff view: data-diff-side + data-diff-line-key="b:254-l:254-r:253"
     const side = cell.getAttribute('data-diff-side');
     if (side) {
-      if (side === 'right') return { line: own, approx: false };
+      if (side === 'right') {
+        if (!Number.isNaN(own)) return { line: own, approx: false };
+        // Moitié droite vide d'une ligne supprimée : même calcul que depuis la cellule de gauche.
+        const left = cells.find((c) => c.getAttribute('data-diff-side') === 'left');
+        if (left) return lineFor(left);
+        return { line: 1, approx: true };
+      }
       const r = (cell.getAttribute('data-diff-line-key') || '').match(/(?:^|-)r:(\d+)/);
       // Unchanged line shown on the left: the key gives its number in the new file
       if (cell.classList.contains('diff-line-number-neutral') && r) return { line: +r[1]!, approx: false };
@@ -144,9 +156,24 @@ export default defineContentScript({
 
   // ---------- Opening ----------
 
+  // Message au background. Après un rechargement ou une mise à jour de l'extension, le script de cet
+  // onglet est orphelin : l'appel lève (parfois sans attendre) "Extension context invalidated".
+  type Reply = { ok: boolean; status?: number; error?: string } | undefined;
+  async function send(msg: object): Promise<Reply> {
+    try {
+      return (await browser.runtime.sendMessage(msg)) as Reply;
+    } catch (e) {
+      if (/context invalidated/i.test(String(e))) {
+        toast('ReviewHopper a été mis à jour : recharger la page.');
+        return new Promise(() => {}); // aucun autre message
+      }
+      return { ok: false, error: String(e) };
+    }
+  }
+
   function openUrl(url: string) {
     if (/^https?:\/\//i.test(url)) {
-      browser.runtime.sendMessage({ type: 'http', url }).then((res: any) => {
+      send({ type: 'http', url }).then((res) => {
         if (!res || !res.ok) {
           toast(`IDE injoignable (${res?.status || res?.error || 'pas de réponse'}). L'IDE est-il lancé ? Vérifier l'URL du modèle personnalisé.`);
         }
@@ -169,6 +196,10 @@ export default defineContentScript({
       toast('Impossible de trouver le chemin du fichier sur cette page.');
       return;
     }
+    if (!safeRel(rel)) {
+      toast('Chemin de fichier refusé (.., chemin absolu ou caractères invalides).');
+      return;
+    }
     let line: number | undefined = forcedLine;
     let approx = false;
     if (line == null) {
@@ -176,7 +207,7 @@ export default defineContentScript({
       if (!cell) return;
       ({ line, approx } = lineFor(cell));
     }
-    if (!line || Number.isNaN(line)) line = 1;
+    if (!line || Number.isNaN(line)) { line = 1; approx = true; }
 
     const root = localRoot(cfg, repoI.owner, repoI.repo);
     if (!root && cfg.ide === 'jetbrains') {
@@ -203,8 +234,8 @@ export default defineContentScript({
     const q = (file: string) => `http://localhost:${port}/api/file?file=${encodeURIComponent(file)}&line=${line}&column=1`;
     const urls = [];
     const parts = rel.split('/');
-    for (let i = 0; i < parts.length - 1; i++) urls.push(q(parts.slice(i).join('/')));
-    browser.runtime.sendMessage({ type: 'httpTry', urls }).then((res: any) => {
+    for (let i = 0; i < parts.length; i++) urls.push(q(parts.slice(i).join('/')));
+    send({ type: 'httpTry', urls }).then((res) => {
       if (res && res.ok) {
         toast(`${approx ? '⚠︎ Ligne supprimée, position approximative · ' : ''}${rel}:${line}`);
       } else if (res && res.status === 404) {
@@ -224,7 +255,7 @@ export default defineContentScript({
       t = document.createElement('div');
       t.id = 'gh2ide-toast';
       t.addEventListener('click', (e) => {
-        if ((e.target as Element | null)?.closest('[data-gh2ide-options]')) browser.runtime.sendMessage({ type: 'options' });
+        if ((e.target as Element | null)?.closest('[data-gh2ide-options]')) send({ type: 'options' });
       });
       document.body.appendChild(t);
     }
@@ -335,9 +366,11 @@ export default defineContentScript({
 
 
   function decorateThreads() {
-    for (const a of document.querySelectorAll(THREAD_LINK)) {
+    for (const a of threadLinks(document)) {
       const h2 = a.closest('h2');
       if (!h2 || h2.querySelector('.gh2ide-copy')) continue;
+      const rel = safeRel(clean(a.textContent));
+      if (!rel) continue;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'gh2ide-copy';
@@ -349,7 +382,6 @@ export default defineContentScript({
       b.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const rel = clean(a.textContent);
         copyText(rel);
         // Retour visuel comme le bouton natif de GitHub : coche verte pendant 2 s.
         // Relance l'animation même si on reclique pendant l'état "copié".
@@ -385,7 +417,7 @@ export default defineContentScript({
     if (header && filePathFor(header)) {
       e.preventDefault();
       e.stopPropagation();
-      const isThread = header.tagName === 'H2' && header.querySelector(THREAD_LINK);
+      const isThread = header.tagName === 'H2' && threadLinks(header).length > 0;
       openFor(header, isThread ? threadHeaderLine(header) : 1);
     }
   }, true);

@@ -55,6 +55,10 @@ Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Fi
   contenir plusieurs fils → on ne prend le chemin que si tous les liens de l'article concordent).
 - En-tête : `<h2><a href="/<o>/<r>/pull/<n>/changes#r<id>">‎<chemin>‎</a><span>Line 122</span></h2>`
   (sélecteur `THREAD_LINK = 'h2 a[href*="#r"]'`, U+200E à nettoyer). Plage : "Lines X to Y" → on prend Y.
+  Sécurité (2026-11-20) : `isThreadLink` n'accepte qu'un href `/pull/<n>/(changes|files)#r<id>` hors de
+  `.markdown-body`/`.comment-body` (sinon un `## [../../x](#r1)` dans un commentaire passait pour un en-tête), et
+  `safeRel` (`utils/ide.ts`) refuse `..`, `.`, segments vides, chemin absolu, `\\` et caractères de contrôle, à l'ouverture
+  comme à la copie.
 - Snippet : `div[class*=StaticDiffPreview] table`, vue unifiée, numéros dans `td[class*=diffLineNumber] > code`.
   Une colonne, ou **deux (ancien, nouveau)** : vu sur une ligne de contexte "641 660" → on prend la
   dernière (nouveau fichier). Type de ligne via `code[class*=Addition|Deletion|…Line]`, ou colonne
@@ -69,7 +73,8 @@ Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Fi
 
 ## Ouverture dans l'IDE
 
-- VS Code / Insiders / Cursor / Windsurf / VSCodium / Zed : `<scheme>://file/<abs>:<line>:<col>`,
+- VS Code / Insiders / Cursor / Windsurf / VSCodium / Zed : `<scheme>://file/<abs>:<line>:<col>` (chaque segment encodé
+  avec `encodeURIComponent`, sinon `#`/`?` tronquent le chemin ; `C:` gardé),
   ouvert via un `<a>` cliqué depuis le content script. Nécessite `baseDir` ou `mappings`.
 - **Android Studio / JetBrains** avec dossier local : `idea://open?file=<abs>&line=<n>` (voir État).
   Sans dossier : Android Studio → toast "Configurer" ; `jetbrains` → ancien fallback serveur intégré
@@ -86,6 +91,9 @@ Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Fi
   un fichier existant et une ligne numérique, puis `exec xed --line`. Info.plist : `CFBundleURLTypes`
   `reviewhopper-xcode`, `LSUIElement`, re-signature ad hoc, `lsregister -f`. Lien :
   `reviewhopper-xcode://open?file=<abs encodé>&line=<n>` (validé : chemin avec espace et accents, ligne 30).
+  N'importe quel site peut appeler ce schéma : `open.sh` refuse aussi les `%` mal formés et les `\\` (décodage `printf %b`)
+  et les fichiers en quarantaine (téléchargés, ex. un `Package.swift` déposé par un site, que Xcode évaluerait).
+  Notification via `osascript ... on run argv` (chemin en argument, pas dans le source AppleScript). Depuis v0.2.0.
 - **Distribution Homebrew** : dépôts publics `jean-melikian/reviewhopper` (tag `v0.1.0`) et `jean-melikian/homebrew-tap`,
   cask `Casks/reviewhopper-xcode.rb` : `installer script` lance `install.sh` depuis l'archive du tag, `uninstall script`
   avec `--uninstall`. L'app est construite sur la machine, donc pas de quarantaine Gatekeeper. Une **formule** a été

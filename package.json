@@ -1,7 +1,7 @@
 {
   "name": "reviewhopper",
   "description": "Ouvre dans l'éditeur local le fichier et la ligne d'une review GitHub (diff de PR, commit, commentaires).",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {

@@ -10,6 +10,8 @@
 set -euo pipefail
 
 APP="${REVIEWHOPPER_APP:-$HOME/Applications/ReviewHopper Xcode.app}"
+# Garde-fou avant les rm -rf : uniquement un bundle .app.
+[[ "$APP" == *.app && "$APP" != /*.app/* ]] || { echo "REVIEWHOPPER_APP doit se terminer par .app : $APP" >&2; exit 1; }
 SCHEME="reviewhopper-xcode"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
@@ -41,8 +43,8 @@ rm -rf "$APP"
 mkdir -p "$(dirname "$APP")"
 osacompile -o "$APP" "$TMP/main.applescript"
 
-# Décodage de l'URL et ouverture. Seuls un chemin absolu vers un fichier existant et une ligne
-# numérique sont acceptés ; xed ne fait qu'ouvrir le fichier.
+# Décodage de l'URL et ouverture. N'importe quel site ou app peut appeler ce schéma : on n'accepte
+# qu'un chemin absolu vers un fichier existant, non téléchargé (pas de quarantaine), et une ligne numérique.
 cat > "$APP/Contents/Resources/open.sh" <<'SH'
 #!/bin/bash
 set -u
@@ -57,10 +59,19 @@ for kv in "${pairs[@]}"; do
     line=*) line=${kv#line=} ;;
   esac
 done
+notify() {
+  osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title "ReviewHopper Xcode"' -e 'end run' "$1" >/dev/null 2>&1
+}
+# Seuls des %XX valides sont décodés (printf %b interpréterait aussi un \ présent en clair).
+[[ "$file" != *\\* && ! "$file" =~ %([^0-9A-Fa-f]|.[^0-9A-Fa-f]|.?$) ]] || { notify "Lien invalide"; exit 1; }
 decode() { local s=${1//+/ }; printf '%b' "${s//%/\\x}"; }
 file=$(decode "$file")
 [[ "$line" =~ ^[0-9]+$ ]] || line=1
-[[ "$file" == /* && -f "$file" ]] || { osascript -e "display notification \"Fichier introuvable : $(printf %q "$file" | tr -d '\"')\" with title \"ReviewHopper Xcode\""; exit 1; }
+[[ "$file" == /* && -f "$file" ]] || { notify "Fichier introuvable : $file"; exit 1; }
+# Fichier téléchargé (ex. un Package.swift déposé par un site) : Xcode pourrait l'évaluer.
+if xattr -p com.apple.quarantine "$file" >/dev/null 2>&1; then
+  notify "Fichier téléchargé refusé : $file"; exit 1
+fi
 exec /usr/bin/xed --line "$line" "$file"
 SH
 chmod +x "$APP/Contents/Resources/open.sh"
