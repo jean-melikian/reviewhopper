@@ -1,0 +1,55 @@
+name: Release
+
+# Pousser un tag vX.Y.Z identique à la version de package.json :
+#   git tag v1.2.0 && git push origin v1.2.0
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Tag et package.json concordent
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME différent de la version de package.json (v$version)"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run compile
+      - run: npm run zip
+      - run: npm run zip:firefox
+      - name: Lint Firefox (web-ext)
+        run: npx --yes web-ext@8 lint --source-dir .output/firefox-mv3
+
+      - run: (cd .output && shasum -a 256 *.zip > SHA256SUMS.txt)
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            .output/*-chrome.zip .output/*-firefox.zip .output/*-sources.zip .output/SHA256SUMS.txt
+          sha=$(curl -sL "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$GITHUB_REF_NAME.tar.gz" | shasum -a 256 | cut -d' ' -f1)
+          {
+            echo "### Cask Homebrew"
+            echo "Dans jean-melikian/homebrew-tap, Casks/reviewhopper-xcode.rb :"
+            echo '```ruby'
+            echo "version \"${GITHUB_REF_NAME#v}\""
+            echo "sha256 \"$sha\""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

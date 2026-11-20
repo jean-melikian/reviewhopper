@@ -77,6 +77,20 @@ Elle s'installe dans `~/Applications/ReviewHopper Xcode.app` et ne tourne que le
 - `npm run compile` : vérification TypeScript.
 - `npm run zip` / `npm run zip:firefox` : archives pour le Chrome Web Store, Edge Add-ons et addons.mozilla.org (plus l'archive des sources demandée par Mozilla, reconstruite avec `npm install` puis `npm run zip:firefox`).
 
+### Publier une version
+
+1. Mettre la nouvelle version dans `package.json` (ex. `1.3.0`) et committer.
+2. Pousser le tag correspondant :
+
+   ```bash
+   git tag v1.3.0 && git push origin v1.3.0
+   ```
+
+3. Le workflow `Release` vérifie que le tag et `package.json` concordent, construit, lint le build Firefox, puis crée la release GitHub avec les zips Chrome, Firefox et sources (plus `SHA256SUMS.txt`).
+4. Si `helpers/xcode/` a changé : reporter `version` et `sha256` affichés dans le résumé du workflow dans le cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`).
+
+Le workflow `CI` vérifie les types et les deux builds à chaque push sur `main` et à chaque PR.
+
 ## Utilisation
 
 - Onglet **Files changed** d'une PR ou page de commit : survoler une ligne puis cliquer sur le bouton **↗**, ou Alt+clic (⌥+clic sur Mac) sur la ligne.

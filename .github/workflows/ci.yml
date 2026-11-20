@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run compile
+      - run: npm run build
+      - run: npm run build:firefox
+      - name: Lint Firefox (web-ext)
+        run: npx --yes web-ext@8 lint --source-dir .output/firefox-mv3
+      - name: Vérifier le script de l'app relais Xcode
+        run: bash -n helpers/xcode/install.sh

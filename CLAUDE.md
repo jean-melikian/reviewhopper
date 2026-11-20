@@ -99,6 +99,10 @@ Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Fi
   avec `--uninstall`. L'app est construite sur la machine, donc pas de quarantaine Gatekeeper. Une **formule** a été
   essayée puis abandonnée : le bac à sable de `post_install` fait échouer `lsregister` (-10822). Nouvelle version :
   tag + release, puis `version` et `sha256` (archive `archive/refs/tags/vX.tar.gz`) dans le cask.
+- **GitHub Actions** (2026-11-20) : `ci.yml` (push main / PR : `compile`, deux builds, `web-ext lint`, `bash -n` du
+  script Xcode) et `release.yml` (tag `v*` : échoue si le tag diffère de `package.json`, zips + `SHA256SUMS.txt` attachés
+  à la release, `version`/`sha256` du cask dans le résumé du job). Le cask reste mis à jour à la main (pas de jeton
+  vers `homebrew-tap`). Versions unifiées à partir de 1.2.0 : tag = version de l'extension (v0.1.0 n'avait que l'app Xcode).
 - Modèle personnalisé : variables `{abs} {absUri} {absEnc} {rel} {root} {line} {line0} {col} {owner} {repo}` ;
   un modèle `http(s)://` est appelé via le service worker au lieu d'être ouvert.
 
