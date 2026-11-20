@@ -179,3 +179,5 @@ Le workflow `CI` vérifie les types et les deux builds à chaque push sur `main`
 ## Licence
 
 [MIT](LICENSE)
+
+Pour signaler une faille de sécurité, voir [SECURITY.md](SECURITY.md) (en anglais ou en français).

@@ -183,3 +183,5 @@ The `CI` workflow checks types and both builds on every push to `main` and every
 ## License
 
 [MIT](LICENSE)
+
+To report a security issue, see [SECURITY.md](SECURITY.md).
