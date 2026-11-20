@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# Un nouveau push sur une PR annule le build en cours de cette PR. Sur main, chaque push va au bout.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
