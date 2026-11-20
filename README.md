@@ -9,6 +9,11 @@ Browser extension that opens the file and line of a GitHub review in your local 
 - Editors: VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed, Android Studio, IntelliJ and other JetBrains IDEs, Xcode, or a custom URL template.
 - Browsers: Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera (Chromium family); Firefox, Zen (Firefox family).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/diff-dark.png">
+  <img alt="Hovering a diff line shows the ↗ button; clicking it opens the line in VS Code" src="docs/screenshots/diff-light.png">
+</picture>
+
 > The extension's interface (settings page, messages) is currently in French only.
 
 ## Contents
@@ -99,6 +104,16 @@ The opened line is the one in the **new version** of the file (the PR branch). F
 
 Saved automatically.
 
+<details>
+<summary>Settings page</summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/options-dark.png">
+  <img alt="Settings page: editor, repository locations, test area" src="docs/screenshots/options-light.png" width="600">
+</picture>
+
+</details>
+
 1. **Editor** ("Éditeur"): see the table in [step 3](#3-choose-your-editor).
 2. **Repository locations** ("Emplacement des dépôts"): one folder per repository (`owner/repo` and its absolute path), and/or a default folder (`/Users/me/dev/{repo}`). `~` is accepted once your home folder is filled in.
 3. **Test** ("Tester"): paste a GitHub file URL (`https://github.com/acme/app/blob/main/src/App.kt#L42`) to see the resolved path and open it.
@@ -164,6 +179,7 @@ Other commands:
 
 - `npm run dev` / `npm run dev:firefox`: test browser with live reload.
 - `npm run compile`: TypeScript check.
+- `npm run screenshots`: regenerate the README screenshots (headless Chrome, after `npm run build`).
 - `npm run zip` / `npm run zip:firefox`: store archives (Chrome Web Store, Edge Add-ons, addons.mozilla.org), plus the source archive Mozilla requires.
 
 ## Releasing

@@ -9,6 +9,11 @@ Extension navigateur qui ouvre dans l'éditeur local le fichier et la ligne d'un
 - Éditeurs : VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed, Android Studio, IntelliJ et autres IDE JetBrains, Xcode, ou modèle d'URL personnalisé.
 - Navigateurs : Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera (famille Chromium) ; Firefox, Zen (famille Firefox).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/diff-dark.png">
+  <img alt="Au survol d'une ligne du diff, le bouton ↗ ouvre la ligne dans VS Code" src="docs/screenshots/diff-light.png">
+</picture>
+
 ## Sommaire
 
 - [Démarrage rapide](#démarrage-rapide)
@@ -97,6 +102,16 @@ La ligne ouverte est celle de la **nouvelle version** du fichier (branche de la 
 
 Enregistrés automatiquement.
 
+<details>
+<summary>Page de réglages</summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/options-dark.png">
+  <img alt="Page de réglages : éditeur, emplacement des dépôts, zone Tester" src="docs/screenshots/options-light.png" width="600">
+</picture>
+
+</details>
+
 1. **Éditeur** : voir le tableau de l'[étape 3](#3-choisir-léditeur).
 2. **Emplacement des dépôts** : un dossier par dépôt (`owner/repo` et son chemin absolu), et/ou un dossier par défaut (`/Users/moi/dev/{repo}`). `~` est accepté une fois le dossier personnel renseigné.
 3. **Tester** : coller une URL de fichier GitHub (`https://github.com/acme/app/blob/main/src/App.kt#L42`) pour voir le chemin résolu et l'ouvrir.
@@ -160,6 +175,7 @@ Autres commandes :
 
 - `npm run dev` / `npm run dev:firefox` : navigateur de test avec rechargement automatique.
 - `npm run compile` : vérification TypeScript.
+- `npm run screenshots` : régénère les captures du README (Chrome headless, après `npm run build`).
 - `npm run zip` / `npm run zip:firefox` : archives des stores (Chrome Web Store, Edge Add-ons, addons.mozilla.org), plus l'archive des sources demandée par Mozilla.
 
 ## Publier une version
