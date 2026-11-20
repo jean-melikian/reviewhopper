@@ -1,7 +1,7 @@
 {
   "name": "reviewhopper",
   "description": "Ouvre dans l'éditeur local le fichier et la ligne d'une review GitHub (diff de PR, commit, commentaires).",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -12,8 +12,10 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
+    "zip:store": "REVIEWHOPPER_STORE=1 wxt zip",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "screenshots": "node scripts/screenshots/run.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

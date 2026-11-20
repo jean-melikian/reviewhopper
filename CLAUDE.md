@@ -4,7 +4,7 @@ Extension navigateur (Manifest V3, TypeScript, [WXT](https://wxt.dev) 0.21) qui,
 (PR « Files changed » / « Changes », commit), ouvre le fichier + la ligne dans l'IDE local.
 Éditeur par défaut : **VS Code** (`DEFAULTS.ide` dans `utils/ide.ts`). Android Studio / JetBrains via `idea://` (testé sur macOS), les autres via leur schéma d'URL.
 
-Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris par le paquet npm de justinloveless/github-to-ide, même usage). Le préfixe technique `gh2ide` (ids CSS, `data-gh2ide-*`) est volontairement conservé. Depuis WXT (2026-11-18), l'extension se charge depuis `.output/chrome-mv3` : l'ID non empaqueté a changé une fois (réglages à ressaisir).
+Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris par le paquet npm de justinloveless/github-to-ide, même usage). Le préfixe technique `gh2ide` (ids CSS, `data-gh2ide-*`) est volontairement conservé. **ID Chrome figé** (2026-11-20) par le champ `key` (clé publique, `wxt.config.ts`) : `gohgmgkpeooiholmejldmdkfjdbbnhkj` pour tout build non empaqueté (release, build de PR, local), donc mêmes réglages `storage.sync` quel que soit le dossier. Avant, l'ID dépendait du chemin du dossier. Clé privée jetée (inutile sans .crx). Le Chrome Web Store refuse `key` : `npm run zip:store` (`REVIEWHOPPER_STORE=1`). Firefox : l'id gecko fixe déjà l'identité.
 
 ## Fichiers
 
@@ -13,10 +13,11 @@ Nom public : **ReviewHopper** (choisi le 2026-11-17 : `gh2ide` est déjà pris p
 | `wxt.config.ts` | Manifest (généré par WXT) : permissions, `host_permissions` localhost/127.0.0.1, icônes ; MV3 forcé pour Firefox (WXT vise MV2 par défaut) avec `browser_specific_settings.gecko` (id `reviewhopper@jean-melikian.github.io`, Firefox 140+, `data_collection_permissions: none` exigé par AMO). |
 | `utils/ide.ts` | Logique commune (modules importés par le content script et les options) : `DEFAULTS`, types `Config`, résolution du dossier local (`resolveRoot`, `~` via `home`), construction du lien (`ideUrl`), parsing des correspondances, validation des chemins. |
 | `utils/config.ts` | `loadConfig` (storage.sync complété par `DEFAULTS`) / `saveConfig`. |
-| `entrypoints/content/` | `index.ts` : détection fichier/ligne, bouton ↗ au survol, Alt+clic, toasts, bouton de copie. `style.css` : styles injectés sur GitHub. |
+| `entrypoints/content/` | `index.ts` : détection fichier/ligne, bouton ↗ au survol, Alt+clic, toasts, bouton de copie. Toasts construits en DOM (pas d'innerHTML) : `ok`/`warn`/`err` (4/7/9 s, pause au survol, ✕, Échap, `role=alert` pour les erreurs), action "Indiquer le dossier" qui ouvre `options.html#add=owner/repo` (ligne préremplie, focus sur le dossier). Lien de schéma : si la fenêtre ne perd pas le focus dans les 2 s, piste "Rien ne s'ouvre ?" propre à l'éditeur (heuristique, l'ouverture d'une app fait perdre le focus). `style.css` : styles injectés sur GitHub. |
 | `entrypoints/background.ts` | Ouvre les options (install / clic sur l'icône) ; fait les `fetch` vers le serveur local de l'IDE (messages `http` et `httpTry`). Service worker sur Chromium, script d'arrière-plan sur Firefox (géré par WXT). |
 | `entrypoints/options/` | `index.html` + `main.ts`. Réglages dans `storage.sync` : `ide`, `template`, `baseDir`, `mappings`, `home`, `hoverButton`, `jbPort`. Enregistrement automatique (400 ms), correspondances en tableau (sérialisées en texte `owner/repo = /chemin`, lignes `#` conservées, lignes au chemin invalide non enregistrées), validation des chemins, zone "Tester", mode sombre. |
 | `helpers/xcode/install.sh` | Installe / désinstalle l'app relais Xcode (`--uninstall`). `REVIEWHOPPER_APP` change l'emplacement, `REVIEWHOPPER_NO_REGISTER=1` construit sans enregistrer. |
+| `scripts/screenshots/` | `npm run screenshots` : captures du README (`docs/screenshots/`, clair et sombre) via Chrome headless + CDP (`cdp.mjs`). Diff : PR publique #1 sans connexion, donc **ancienne UI, pas la preview** (la preview exige la session de l'utilisateur), content script construit injecté avec un faux `chrome`. Réglages : `options.html` servie en local. GitHub renvoie parfois sa page "Unicorn" : `gotoDiff` recharge. `window.chrome` ne s'assigne pas en headless : `Object.defineProperty`. |
 | `public/icons/`, `icons/src/` | Logo : bulle de commentaire de review avec lignes de diff (+, -, contexte) et pastille ↗ (saut vers l'IDE). Sources `icons/src/logo.svg` (32/48/128) et `logo-small.svg` (16, simplifié). PNG rendus avec Chrome headless (`--screenshot`, `--default-background-color=00000000`) d'une page contenant le SVG en `<img>`. |
 
 Build : `npm run build` (Chromium : Chrome, Edge, Brave, Arc, Dia, Vivaldi) et `npm run build:firefox` (Firefox, Zen). Charger `.output/chrome-mv3` (non empaquetée) ou `.output/firefox-mv3/manifest.json` (about:debugging, temporaire). `npm run dev` recharge à chaud. API : `browser` de WXT (promesses), jamais `chrome.*` ni de callback (`sendMessage(...).then`), sinon Firefox casse.
@@ -48,6 +49,13 @@ Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Fi
 - Ancienne UI (non revérifiée, gardée en fallback) : `.file[data-tagsearch-path]`,
   `.file-header[data-path]`, `td.blob-num[data-line-number]`, `blob-num-deletion`, `data-split-side`.
 - Vue unifiée de la nouvelle UI : **pas testée** (basculer de vue change la préférence du compte GitHub).
+- **Diff en grille hors preview** (relevé le 2026-11-20 sur une page de commit, sans connexion) : la structure
+  ci-dessus vient de la preview "nouvelle PR overview" du compte. Sans preview, les numéros sont dans
+  `td.diff-line-number` **sans** `data-line-number` ni `data-diff-side` (`GRID_CELL`, `gridCellLine`).
+  Unifiée : `[ancien, nouveau, texte]` ; split : `[ancien, texte, nouveau, texte]` ; le numéro du nouveau fichier est
+  la cellule juste avant `td.right-side-diff-cell`. Vide = ligne supprimée (ligne la plus proche, approx).
+  Vérifié en unifiée sur la vraie page (extension injectée dans Chrome headless) ; split non vérifiée (GitHub
+  renvoyait sa page d'erreur). Le code de la preview n'est pas touché (sélecteur exclusif).
 
 ## Onglet Conversation : fils de review (relevé le 2026-11-17 sur une PR privée)
 

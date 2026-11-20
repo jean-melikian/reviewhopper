@@ -7,7 +7,10 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener((msg: any, _sender, send: (r: unknown) => void) => {
     if (msg?.type === 'options') {
-      browser.runtime.openOptionsPage();
+      // Avec un dépôt : réglages ouverts sur une ligne préremplie pour ce dépôt (voir options/main.ts).
+      const repo = typeof msg.repo === 'string' && /^[\w.-]+\/[\w.-]+$/.test(msg.repo) ? msg.repo : null;
+      if (repo) browser.tabs.create({ url: browser.runtime.getURL('/options.html') + '#add=' + encodeURIComponent(repo) });
+      else browser.runtime.openOptionsPage();
       return;
     }
     if (msg?.type === 'httpTry') {

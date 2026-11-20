@@ -9,6 +9,11 @@ Browser extension that opens the file and line of a GitHub review in your local 
 - Editors: VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed, Android Studio, IntelliJ and other JetBrains IDEs, Xcode, or a custom URL template.
 - Browsers: Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera (Chromium family); Firefox, Zen (Firefox family).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/diff-dark.png">
+  <img alt="Hovering a diff line shows the ↗ button; clicking it opens the line in VS Code" src="docs/screenshots/diff-light.png">
+</picture>
+
 > The extension's interface (settings page, messages) is currently in French only.
 
 ## Contents
@@ -83,7 +88,7 @@ brew install --cask jean-melikian/tap/reviewhopper-xcode
 
 ### Updating the extension
 
-- **Chromium**: replace the contents of the step 2 folder with the new zip's contents, click ↻ on the extension card, then reload your GitHub tabs. Keeping the same folder keeps your settings: loading another folder creates a new extension, without settings.
+- **Chromium**: remove the old version from the extensions page, load the new unzipped folder, then reload your GitHub tabs. Settings are kept: every build (release, PR test build, local build) has the same extension ID. Builds from before 1.3.0 had a folder-dependent ID: their settings have to be entered once more.
 - **Firefox**: load the new zip as in step 2.
 
 ## Usage
@@ -98,6 +103,16 @@ The opened line is the one in the **new version** of the file (the PR branch). F
 ## Settings
 
 Saved automatically.
+
+<details>
+<summary>Settings page</summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/options-dark.png">
+  <img alt="Settings page: editor, repository locations, test area" src="docs/screenshots/options-light.png" width="600">
+</picture>
+
+</details>
 
 1. **Editor** ("Éditeur"): see the table in [step 3](#3-choose-your-editor).
 2. **Repository locations** ("Emplacement des dépôts"): one folder per repository (`owner/repo` and its absolute path), and/or a default folder (`/Users/me/dev/{repo}`). `~` is accepted once your home folder is filled in.
@@ -164,7 +179,9 @@ Other commands:
 
 - `npm run dev` / `npm run dev:firefox`: test browser with live reload.
 - `npm run compile`: TypeScript check.
-- `npm run zip` / `npm run zip:firefox`: store archives (Chrome Web Store, Edge Add-ons, addons.mozilla.org), plus the source archive Mozilla requires.
+- `npm run screenshots`: regenerate the README screenshots (headless Chrome, after `npm run build`).
+- `npm run zip` / `npm run zip:firefox`: release archives, plus the source archive Mozilla requires.
+- `npm run zip:store`: Chrome archive without the `key` field (refused by the Chrome Web Store, which assigns its own ID).
 
 ## Releasing
 
@@ -178,7 +195,7 @@ Other commands:
 3. The `Release` workflow checks that the tag matches `package.json`, builds, lints the Firefox build, then creates the GitHub release with the Chrome, Firefox and source zips (plus `SHA256SUMS.txt`).
 4. If `helpers/xcode/` changed: copy the `version` and `sha256` shown in the workflow summary into the cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`).
 
-The `CI` workflow checks types and both builds on every push to `main` and every PR.
+The `CI` workflow checks types and both builds on every push to `main` and every PR. On a PR, it also attaches test builds (Chrome and Firefox, kept 14 days) and posts direct download links in a comment on the PR, updated on every push: download, then load as in [step 2](#2-add-it-to-your-browser).
 
 ## License
 

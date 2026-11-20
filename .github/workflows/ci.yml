@@ -8,9 +8,18 @@ on:
 permissions:
   contents: read
 
+# Un nouveau push sur une PR annule le build en cours de cette PR. Sur main, chaque push va au bout.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      chrome-url: ${{ steps.chrome.outputs.artifact-url }}
+      firefox-url: ${{ steps.firefox.outputs.artifact-url }}
+      suffix: ${{ steps.name.outputs.suffix }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -25,3 +34,74 @@ jobs:
         run: npx --yes web-ext@8 lint --source-dir .output/firefox-mv3
       - name: Vérifier le script de l'app relais Xcode
         run: bash -n helpers/xcode/install.sh
+
+      # Builds à tester, attachés au run (téléchargeables depuis l'onglet Checks de la PR).
+      - name: Nom des builds
+        id: name
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            echo "suffix=pr${{ github.event.number }}-$(echo ${{ github.event.pull_request.head.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=main-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        id: chrome
+        with:
+          name: reviewhopper-chrome-${{ steps.name.outputs.suffix }}
+          path: .output/chrome-mv3
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        id: firefox
+        with:
+          name: reviewhopper-firefox-${{ steps.name.outputs.suffix }}
+          path: .output/firefox-mv3
+          retention-days: 14
+      - name: Mode d'emploi
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Tester ce build
+          Télécharger l'artefact en bas de cette page (connexion GitHub requise).
+          - **Chromium** (\`reviewhopper-chrome-${{ steps.name.outputs.suffix }}\`) : décompresser, puis \`chrome://extensions\`, Mode développeur, **Charger l'extension non empaquetée**.
+          - **Firefox** (\`reviewhopper-firefox-${{ steps.name.outputs.suffix }}\`) : \`about:debugging#/runtime/this-firefox\`, **Charger un module complémentaire temporaire**, choisir le zip téléchargé.
+          EOF
+
+  # Commentaire fixe sous la PR avec les liens directs vers les builds : créé au premier run, puis
+  # remplacé (retrouvé par son marqueur). Un commentaire du bot ne peut pas être modifié par l'auteur de
+  # la PR, contrairement à la description. PR du dépôt uniquement : une PR venant d'un fork n'a pas le
+  # droit d'écrire.
+  links:
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Liens vers les builds de test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHROME_URL: ${{ needs.build.outputs.chrome-url }}
+          FIREFOX_URL: ${{ needs.build.outputs.firefox-url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          cat > body.md <<EOF
+          <!-- reviewhopper-builds -->
+          ### Builds de test
+
+          Commit ${HEAD_SHA::7}, gardés 14 jours, connexion GitHub requise. Ce commentaire est mis à jour à chaque push.
+
+          | Navigateur | Build | Installation |
+          |---|---|---|
+          | Chrome, Edge, Brave, Arc, Dia | [Télécharger]($CHROME_URL) | Décompresser, puis \`chrome://extensions\` > Mode développeur > Charger l'extension non empaquetée |
+          | Firefox, Zen | [Télécharger]($FIREFOX_URL) | \`about:debugging#/runtime/this-firefox\` > Charger un module complémentaire temporaire > choisir le zip |
+
+          [Détail du build]($RUN_URL)
+          EOF
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            -q '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- reviewhopper-builds -->")))][0].id // empty')
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@body.md > /dev/null
+          else
+            gh pr comment "$PR" -R "$GITHUB_REPOSITORY" --body-file body.md
+          fi
