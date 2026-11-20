@@ -18,6 +18,12 @@ export const SCHEMES: Partial<Record<Ide, string>> = {
   zed: 'zed',
 };
 
+// Nom affiché de chaque éditeur (messages, infobulles).
+export const EDITOR_NAMES: Record<Ide, string> = {
+  vscode: 'VS Code', insiders: 'VS Code Insiders', cursor: 'Cursor', windsurf: 'Windsurf', vscodium: 'VSCodium',
+  zed: 'Zed', androidstudio: 'Android Studio', jetbrains: "l'IDE JetBrains", xcode: 'Xcode', custom: "l'éditeur",
+};
+
 export const isJetBrains = (ide: string) => ide === 'androidstudio' || ide === 'jetbrains';
 
 export function expandHome(path: string, home: string): string {

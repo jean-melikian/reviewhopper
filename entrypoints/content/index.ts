@@ -1,5 +1,5 @@
 import './style.css';
-import { DEFAULTS, localRoot, ideUrl, safeRel, type Config } from '@/utils/ide';
+import { DEFAULTS, EDITOR_NAMES, localRoot, ideUrl, safeRel, type Config } from '@/utils/ide';
 import { loadConfig } from '@/utils/config';
 
 export default defineContentScript({
@@ -164,22 +164,38 @@ export default defineContentScript({
       return (await browser.runtime.sendMessage(msg)) as Reply;
     } catch (e) {
       if (/context invalidated/i.test(String(e))) {
-        toast('ReviewHopper a été mis à jour : recharger la page.');
+        toast({ kind: 'warn', text: 'ReviewHopper a été mis à jour : recharger la page.' });
         return new Promise(() => {}); // aucun autre message
       }
       return { ok: false, error: String(e) };
     }
   }
 
-  function openUrl(url: string) {
+  const editorName = () => EDITOR_NAMES[cfg.ide] ?? "l'éditeur";
+  const APPROX = 'Ligne supprimée : ouverture de la ligne la plus proche. ';
+
+  // Piste affichée si rien ne s'est ouvert : un lien de schéma non enregistré ne fait rien, sans erreur.
+  function noOpenHint(): Partial<ToastOpts> {
+    const n = editorName();
+    if (cfg.ide === 'xcode') return { hint: "Rien ne s'ouvre ? Installer l'app ReviewHopper Xcode.", action: { label: 'Voir les réglages' } };
+    if (cfg.ide === 'androidstudio' || cfg.ide === 'jetbrains') return { hint: `Rien ne s'ouvre ? Lancer ${n} une fois pour qu'il gère les liens idea://.` };
+    if (cfg.ide === 'custom') return { hint: "Rien ne s'ouvre ? Vérifier le modèle d'URL.", action: { label: 'Voir les réglages' } };
+    return { hint: `Rien ne s'ouvre ? Vérifier que ${n} est installé.` };
+  }
+
+  function openUrl(url: string, opened: ToastOpts) {
     if (/^https?:\/\//i.test(url)) {
       send({ type: 'http', url }).then((res) => {
-        if (!res || !res.ok) {
-          toast(`IDE injoignable (${res?.status || res?.error || 'pas de réponse'}). L'IDE est-il lancé ? Vérifier l'URL du modèle personnalisé.`);
-        }
+        if (res?.ok) toast(opened);
+        else toast({ kind: 'err', text: `L'éditeur ne répond pas (${res?.status || res?.error || 'pas de réponse'}). Est-il lancé ? Vérifier aussi le modèle d'URL.`, action: { label: 'Voir les réglages' } });
       });
       return;
     }
+    // Lien de schéma (vscode://, idea://…) : si l'éditeur prend la main, la fenêtre perd le focus.
+    // Sinon, au bout de 2 s, on ajoute la piste "Rien ne s'ouvre ?".
+    let left = false;
+    const onBlur = () => { left = true; };
+    window.addEventListener('blur', onBlur, { once: true });
     const a = document.createElement('a');
     a.href = url;
     a.rel = 'noopener';
@@ -187,17 +203,22 @@ export default defineContentScript({
     document.body.appendChild(a);
     a.click();
     a.remove();
+    const shown = toast(opened);
+    setTimeout(() => {
+      window.removeEventListener('blur', onBlur);
+      if (!left && document.hasFocus() && shown.isCurrent()) toast({ ...opened, ...noOpenHint() });
+    }, 2000);
   }
 
   function openFor(el: Element, forcedLine?: number) {
     const repoI = repoInfo();
     const rel = filePathFor(el);
     if (!repoI || !rel) {
-      toast('Impossible de trouver le chemin du fichier sur cette page.');
+      toast({ kind: 'err', text: 'Impossible de trouver le chemin du fichier sur cette page.' });
       return;
     }
     if (!safeRel(rel)) {
-      toast('Chemin de fichier refusé (.., chemin absolu ou caractères invalides).');
+      toast({ kind: 'err', text: 'Chemin de fichier refusé (.., chemin absolu ou caractères invalides).' });
       return;
     }
     let line: number | undefined = forcedLine;
@@ -209,27 +230,26 @@ export default defineContentScript({
     }
     if (!line || Number.isNaN(line)) { line = 1; approx = true; }
 
+    const repo = `${repoI.owner}/${repoI.repo}`;
     const root = localRoot(cfg, repoI.owner, repoI.repo);
     if (!root && cfg.ide === 'jetbrains') {
-      openJetBrainsHttp({ rel, line, approx });
+      openJetBrainsHttp({ rel, line, approx, repo });
       return;
     }
     if (!root) {
-      const name = `${repoI.owner}/${repoI.repo}`.replace(/[<>&"']/g, '');
-      toast(`Aucun dossier local configuré pour ${name}. <a data-gh2ide-options>Configurer</a>`, true);
+      toast({ kind: 'warn', text: `Dossier local inconnu pour ${repo}.`, action: { label: 'Indiquer le dossier', repo } });
       return;
     }
     const url = ideUrl(cfg, { root, rel, line, ...repoI });
     if (!url) {
-      toast('Modèle d\'URL personnalisé vide. <a data-gh2ide-options>Configurer</a>', true);
+      toast({ kind: 'warn', text: "Modèle d'URL personnalisé vide.", action: { label: 'Voir les réglages' } });
       return;
     }
-    openUrl(url);
-    toast(`${approx ? '⚠︎ Ligne supprimée, position approximative · ' : ''}${rel}:${line}`);
+    openUrl(url, { kind: approx ? 'warn' : 'ok', text: `${approx ? APPROX : ''}Ouverture dans ${editorName()} : ${rel}:${line}` });
   }
 
   // IntelliJ & co sans dossier local : serveur intégré de l'IDE, chemin relatif aux projets ouverts.
-  function openJetBrainsHttp({ rel, line, approx }: { rel: string; line: number; approx: boolean }) {
+  function openJetBrainsHttp({ rel, line, approx, repo }: { rel: string; line: number; approx: boolean; repo: string }) {
     const port = /^\d+$/.test(cfg.jbPort || '') ? cfg.jbPort : '63342';
     const q = (file: string) => `http://localhost:${port}/api/file?file=${encodeURIComponent(file)}&line=${line}&column=1`;
     const urls = [];
@@ -237,40 +257,81 @@ export default defineContentScript({
     for (let i = 0; i < parts.length; i++) urls.push(q(parts.slice(i).join('/')));
     send({ type: 'httpTry', urls }).then((res) => {
       if (res && res.ok) {
-        toast(`${approx ? '⚠︎ Ligne supprimée, position approximative · ' : ''}${rel}:${line}`);
+        toast({ kind: approx ? 'warn' : 'ok', text: `${approx ? APPROX : ''}Ouverture dans ${editorName()} : ${rel}:${line}` });
       } else if (res && res.status === 404) {
-        toast('Aucun dossier local configuré pour ce dépôt. <a data-gh2ide-options>Configurer</a>', true);
+        toast({ kind: 'warn', text: `Fichier introuvable dans les projets ouverts. Indiquer le dossier local de ${repo} (recommandé).`, action: { label: 'Indiquer le dossier', repo } });
       } else {
-        toast(`IDE injoignable (${res?.status || res?.error || 'pas de réponse'}). L'IDE est-il lancé ? Vérifier le port et "Allow unsigned requests" (Settings › Tools › Web Browsers and Preview), ou configurer le dossier local du dépôt.`);
+        toast({ kind: 'err', text: `L'IDE ne répond pas sur le port ${port}. Indiquer le dossier local de ${repo} (recommandé), ou cocher "Allow unsigned requests" dans l'IDE.`, action: { label: 'Indiquer le dossier', repo } });
       }
     });
   }
 
   // ---------- UI ----------
 
+  // Toast construit en DOM (jamais d'innerHTML). Erreur : role=alert ; minuterie en pause au survol.
+  type ToastOpts = { kind: 'ok' | 'warn' | 'err'; text: string; hint?: string; action?: { label: string; repo?: string } };
+  const DURATION = { ok: 4000, warn: 7000, err: 9000 };
+  let toastSeq = 0;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
-  function toast(msg: string, html = false) {
-    let t = document.getElementById('gh2ide-toast');
-    if (!t) {
-      t = document.createElement('div');
-      t.id = 'gh2ide-toast';
-      t.addEventListener('click', (e) => {
-        if ((e.target as Element | null)?.closest('[data-gh2ide-options]')) send({ type: 'options' });
-      });
-      document.body.appendChild(t);
+  let toastLeft = 0;
+  let toastStart = 0;
+  const toastEl = document.createElement('div');
+  toastEl.id = 'gh2ide-toast';
+  const hideToast = () => { clearTimeout(toastTimer); toastEl.hidden = true; };
+  const armToast = (ms: number) => { clearTimeout(toastTimer); toastStart = Date.now(); toastLeft = ms; toastTimer = setTimeout(hideToast, ms); };
+  toastEl.addEventListener('mouseenter', () => { clearTimeout(toastTimer); toastLeft -= Date.now() - toastStart; });
+  toastEl.addEventListener('mouseleave', () => { if (!toastEl.hidden) armToast(Math.max(toastLeft, 1500)); });
+  toastEl.addEventListener('focusin', () => clearTimeout(toastTimer));
+  toastEl.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideToast(); });
+
+  function toast(o: ToastOpts) {
+    const seq = ++toastSeq;
+    toastEl.replaceChildren();
+    toastEl.className = o.kind;
+    toastEl.setAttribute('role', o.kind === 'err' ? 'alert' : 'status');
+    const body = document.createElement('div');
+    body.className = 'body';
+    const text = document.createElement('div');
+    text.textContent = o.text;
+    body.append(text);
+    if (o.hint) {
+      const h = document.createElement('div');
+      h.className = 'hint';
+      h.textContent = o.hint;
+      body.append(h);
     }
-    if (html) t.innerHTML = msg;
-    else t.textContent = msg;
-    t.style.display = 'block';
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (t!.style.display = 'none'), html ? 6000 : 2500);
+    if (o.action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'link';
+      b.textContent = o.action.label;
+      const repo = o.action.repo;
+      b.addEventListener('click', () => { send({ type: 'options', repo }); hideToast(); });
+      body.append(b);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'close';
+    close.setAttribute('aria-label', 'Fermer');
+    close.textContent = '✕';
+    close.addEventListener('click', hideToast);
+    toastEl.append(body, close);
+    if (!toastEl.isConnected) document.body.appendChild(toastEl);
+    toastEl.hidden = false;
+    armToast(DURATION[o.kind] + (o.hint ? 3000 : 0));
+    return { isCurrent: () => seq === toastSeq && !toastEl.hidden };
   }
 
   const btn = document.createElement('button');
   btn.id = 'gh2ide-btn';
   btn.type = 'button';
   btn.textContent = '↗';
-  btn.title = 'Ouvrir dans l\'IDE (ou Alt+clic sur la ligne)';
+  const ALT = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌥' : 'Alt';
+  const labelBtn = () => {
+    btn.title = `Ouvrir dans ${editorName()} (ou ${ALT}+clic sur la ligne)`;
+    btn.setAttribute('aria-label', `Ouvrir la ligne dans ${editorName()}`);
+  };
+  labelBtn();
   let hoverCell: Element | null = null;
   btn.addEventListener('mousedown', (e) => e.preventDefault());
   btn.addEventListener('click', (e) => {
@@ -305,6 +366,7 @@ export default defineContentScript({
     if (!r.width) return hideBtn();
     clearTimeout(hideTimer);
     mountBtn();
+    labelBtn();
     hoverCell = cell;
     btn.style.left = `${Math.max(0, r.left - 20)}px`;
     btn.style.top = `${r.top + (r.height - 18) / 2}px`;
@@ -338,14 +400,20 @@ export default defineContentScript({
   const tip = document.createElement('div');
   tip.id = 'gh2ide-tip';
   tip.setAttribute('role', 'tooltip');
+  tip.setAttribute('aria-live', 'polite');
   function showTip(el: Element, text: string) {
     tip.textContent = text;
     if (!tip.isConnected) document.body.appendChild(tip);
     tip.style.display = 'block';
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();
-    tip.style.left = `${Math.max(4, r.left + r.width / 2 - t.width / 2)}px`;
-    tip.style.top = `${r.top - t.height - 8}px`;
+    // Centrée au-dessus du bouton, gardée dans la fenêtre ; dessous s'il n'y a pas la place.
+    const left = Math.min(Math.max(4, r.left + r.width / 2 - t.width / 2), innerWidth - t.width - 4);
+    const below = r.top - t.height - 8 < 4;
+    tip.classList.toggle('below', below);
+    tip.style.left = `${left}px`;
+    tip.style.top = `${below ? r.bottom + 8 : r.top - t.height - 8}px`;
+    tip.style.setProperty('--arrow-x', `${r.left + r.width / 2 - left}px`);
   }
   const hideTip = () => { tip.style.display = 'none'; };
   window.addEventListener('scroll', hideTip, true);
@@ -355,14 +423,15 @@ export default defineContentScript({
   function pasteHint() {
     const quick = MAC ? '⌘P' : 'Ctrl+P';
     const jb = MAC ? '⌘⇧O' : 'Ctrl+Shift+N';
-    const hints: Record<string, [string, string]> = {
-      vscode: [quick, 'VS Code'], insiders: [quick, 'VS Code Insiders'], cursor: [quick, 'Cursor'],
-      windsurf: [quick, 'Windsurf'], vscodium: [quick, 'VSCodium'], zed: [quick, 'Zed'],
-      androidstudio: [jb, 'Android Studio'], jetbrains: [jb, "l'IDE JetBrains"], xcode: ['⌘⇧O', 'Xcode'],
+    const paste = MAC ? '⌘V' : 'Ctrl+V';
+    const keys: Partial<Record<Config['ide'], string>> = {
+      vscode: quick, insiders: quick, cursor: quick, windsurf: quick, vscodium: quick, zed: quick,
+      androidstudio: jb, jetbrains: jb, xcode: '⌘⇧O',
     };
-    const h = hints[cfg.ide];
-    return h ? `Copié ! ${h[0]} dans ${h[1]} puis coller` : 'Copié !';
+    const k = keys[cfg.ide];
+    return k ? `Chemin copié. ${k} dans ${EDITOR_NAMES[cfg.ide]}, puis ${paste}` : 'Chemin copié';
   }
+
 
 
   function decorateThreads() {
@@ -377,8 +446,12 @@ export default defineContentScript({
       b.setAttribute('aria-label', 'Copier le chemin du fichier');
       b.innerHTML = COPY_ICON + CHECK_ICON;
       let timer: ReturnType<typeof setTimeout> | undefined;
-      b.addEventListener('mouseenter', () => showTip(b, b.classList.contains('done') ? pasteHint() : 'Copier le chemin'));
-      b.addEventListener('mouseleave', hideTip);
+      b.setAttribute('aria-describedby', 'gh2ide-tip');
+      const tipFor = () => showTip(b, b.classList.contains('done') ? pasteHint() : 'Copier le chemin');
+      b.addEventListener('mouseenter', tipFor);
+      b.addEventListener('focus', tipFor);
+      b.addEventListener('mouseleave', () => { if (document.activeElement !== b) hideTip(); });
+      b.addEventListener('blur', hideTip);
       b.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -390,7 +463,7 @@ export default defineContentScript({
         b.classList.add('done');
         showTip(b, pasteHint());
         clearTimeout(timer);
-        timer = setTimeout(() => { b.classList.remove('done'); if (b.matches(':hover')) showTip(b, 'Copier le chemin'); else hideTip(); }, 2000);
+        timer = setTimeout(() => { b.classList.remove('done'); if (b.matches(':hover') || document.activeElement === b) showTip(b, 'Copier le chemin'); else hideTip(); }, 2000);
       });
       h2.appendChild(b);
     }

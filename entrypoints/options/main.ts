@@ -1,4 +1,4 @@
-import { parseMappings, serializeMappings, resolveRoot, ideUrl, checkPath, type Config, type Mapping, type PathCheck } from '@/utils/ide';
+import { EDITOR_NAMES, parseMappings, serializeMappings, resolveRoot, ideUrl, checkPath, type Config, type Mapping, type PathCheck } from '@/utils/ide';
 import { loadConfig, saveConfig } from '@/utils/config';
 
 const $ = <T extends HTMLElement = HTMLInputElement>(id: string) => document.getElementById(id) as T;
@@ -80,10 +80,12 @@ function validate() {
     if (!res && !r.value.trim() && p.value.trim()) res = { level: 'warn', text: 'Dépôt manquant : cette ligne est ignorée.' };
     if (!res && r.value.trim() && !/^[\w.-]+(\/[\w.-]+)?$/.test(r.value.trim())) res = { level: 'err', text: 'Format attendu : owner/repo ou repo.' };
     p.classList.toggle('bad', res?.level === 'err');
+    p.setAttribute('aria-invalid', String(res?.level === 'err'));
     showMsg(msg, res);
   }
   const b = checkPath($('baseDir').value, home);
   $('baseDir').classList.toggle('bad', b?.level === 'err');
+  $('baseDir').setAttribute('aria-invalid', String(b?.level === 'err'));
   showMsg($('baseDirMsg'), b);
 }
 
@@ -115,6 +117,7 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let statusTimer: ReturnType<typeof setTimeout> | undefined;
 function changed() {
   validate();
+  readiness();
   test();
   clearTimeout(saveTimer);
   $('status').className = '';
@@ -200,7 +203,46 @@ $('testOpen').addEventListener('click', async () => {
   const a = document.createElement('a');
   a.href = lastUrl;
   a.click();
+  const name = EDITOR_NAMES[current().ide];
+  $('testResult').insertAdjacentHTML('beforeend', '<div class="msg ok"></div>');
+  ($('testResult').lastElementChild as HTMLElement).textContent =
+    `Lien envoyé à ${name}. Si rien ne s'ouvre, voir l'étape 1 (et cocher "Toujours autoriser" si le navigateur le demande).`;
 });
+
+// ---------- État de la configuration ----------
+
+function readiness() {
+  const cfg = current();
+  const hasRepo = readRows().some((r) => r.repo.trim() && r.path.trim()) || !!cfg.baseDir;
+  let todo: string | null = null;
+  if (cfg.ide === 'custom' && !cfg.template) todo = "Il reste à remplir le modèle d'URL (étape 1).";
+  else if (!hasRepo) todo = 'Il reste à indiquer où se trouvent les clones locaux (étape 2).';
+  const el = $<HTMLElement>('ready');
+  el.className = todo ? 'ready todo' : 'ready ok';
+  el.textContent = todo ?? (cfg.ide === 'xcode'
+    ? "Prêt, une fois l'app relais Xcode installée (étape 1) : ouvrir une PR sur GitHub et survoler une ligne du diff."
+    : 'Prêt : ouvrir une PR sur GitHub et survoler une ligne du diff.');
+}
+
+// Arrivée depuis le toast "Dossier local inconnu pour owner/repo" : options.html#add=owner/repo.
+function addFromHash() {
+  const m = location.hash.match(/^#add=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname);
+  const repo = decodeURIComponent(m[1]!);
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return;
+  let target = repoInputs().find((r) => r.value.trim().toLowerCase() === repo.toLowerCase())
+    ?? repoInputs().find((r) => !r.value.trim() && !pathOf(r).value.trim());
+  if (!target) {
+    addRow();
+    target = repoInputs().at(-1)!;
+  }
+  if (!target.value.trim()) target.value = repo;
+  const p = pathOf(target);
+  p.scrollIntoView({ block: 'center' });
+  p.focus();
+  changed();
+}
 
 // ---------- Chargement ----------
 
@@ -219,6 +261,8 @@ loadConfig().then((v) => {
   toggle();
   validate();
   test();
+  readiness();
+  addFromHash();
 });
 
 $('ide').addEventListener('change', () => { toggle(); changed(); });
