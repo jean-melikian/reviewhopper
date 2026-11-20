@@ -1,21 +1,75 @@
 # ReviewHopper
 
-Extension Chrome (Manifest V3) qui ouvre le fichier et la ligne d'un diff GitHub (PR, commit, commentaires de review) dans l'éditeur local.
+Extension navigateur (Manifest V3) qui ouvre le fichier et la ligne d'un diff GitHub (PR, commit, commentaires de review) dans l'éditeur local.
 
 ## Installation
 
-Navigateurs : Chrome, Edge, Brave, Arc, Dia, Vivaldi (build Chromium) ; Firefox et Zen (build Firefox).
+L'installation se fait en 3 étapes. La 4e ne concerne que Xcode.
+
+### 1. Construire l'extension
+
+Prérequis : Node.js 22 ou plus récent.
 
 ```bash
+git clone https://github.com/jean-melikian/reviewhopper.git
+cd reviewhopper
 npm install
-npm run build          # Chromium : .output/chrome-mv3
-npm run build:firefox  # Firefox / Zen : .output/firefox-mv3
 ```
 
-- **Chromium** : `chrome://extensions` (ou `edge://extensions`, `brave://extensions`…), activer le **Mode développeur**, **Charger l'extension non empaquetée** puis choisir `.output/chrome-mv3`.
-- **Firefox / Zen** : `about:debugging#/runtime/this-firefox`, **Charger un module complémentaire temporaire** puis choisir `.output/firefox-mv3/manifest.json` (retiré au redémarrage du navigateur tant que l'extension n'est pas signée par Mozilla).
+### 2. L'ajouter au navigateur
 
-La page de réglages s'ouvre : choisir l'éditeur et indiquer où se trouvent les clones locaux.
+Choisir **une seule** des deux familles, selon le navigateur utilisé.
+
+**Famille Chromium : Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera**
+
+```bash
+npm run build
+```
+
+1. Ouvrir la page des extensions : `chrome://extensions` (Chrome, Arc, Dia), `edge://extensions` (Edge), `brave://extensions` (Brave), `vivaldi://extensions` (Vivaldi), `opera://extensions` (Opera).
+2. Activer le **Mode développeur**.
+3. Cliquer sur **Charger l'extension non empaquetée** et choisir le dossier `.output/chrome-mv3`.
+
+**Famille Firefox : Firefox, Zen**
+
+```bash
+npm run build:firefox
+```
+
+1. Ouvrir `about:debugging#/runtime/this-firefox`.
+2. Cliquer sur **Charger un module complémentaire temporaire** et choisir le fichier `.output/firefox-mv3/manifest.json`.
+
+Firefox retire une extension temporaire à chaque redémarrage : il faut la recharger jusqu'à sa publication sur addons.mozilla.org.
+
+### 3. Régler l'éditeur
+
+La page de réglages s'ouvre après l'installation (sinon, cliquer sur l'icône de l'extension). Choisir l'éditeur et indiquer où se trouvent les clones locaux (voir [Réglages](#réglages)).
+
+Pour la plupart des éditeurs, c'est terminé :
+
+| Éditeur | À installer en plus |
+|---|---|
+| VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed | Rien |
+| Android Studio, IntelliJ et autres IDE JetBrains | Rien (l'IDE gère déjà les liens `idea://`) |
+| Xcode | L'app relais, étape 4 |
+
+Au premier clic, le navigateur demande l'autorisation d'ouvrir l'éditeur : cocher "Toujours autoriser".
+
+### 4. Xcode uniquement : l'app relais
+
+**À ne faire que si l'éditeur choisi est Xcode.** Les autres éditeurs n'en ont pas besoin.
+
+Xcode n'a pas de lien pour ouvrir un fichier à une ligne précise. Une petite app relais, construite sur la machine, reçoit les liens `reviewhopper-xcode://` de l'extension et lance `xed --line`. Prérequis : macOS et Xcode installé.
+
+```bash
+brew install --cask jean-melikian/tap/reviewhopper-xcode
+```
+
+Elle s'installe dans `~/Applications/ReviewHopper Xcode.app` et ne tourne que le temps d'ouvrir un fichier.
+
+- Mettre à jour : `brew upgrade --cask reviewhopper-xcode`
+- Désinstaller : `brew uninstall --cask reviewhopper-xcode`
+- Sans Homebrew, depuis le dossier cloné : `bash helpers/xcode/install.sh` (désinstaller : `bash helpers/xcode/install.sh --uninstall`)
 
 ## Développement
 
@@ -36,15 +90,7 @@ La ligne ouverte est celle de la **nouvelle version** du fichier (branche de la 
 Enregistrés automatiquement.
 
 1. **Éditeur** : Android Studio, IntelliJ / JetBrains, Xcode, VS Code, Insiders, Cursor, Windsurf, VSCodium, Zed ou modèle d'URL personnalisé.
-2. **Emplacement des dépôts** : un dossier par dépôt (`owner/repo` → chemin absolu) et/ou un dossier par défaut (`/Users/moi/dev/{repo}`). `~` est accepté une fois le dossier personnel renseigné.
-3. **Tester** : coller une URL de fichier GitHub (`…/blob/main/src/App.kt#L42`) pour voir le chemin résolu et l'ouvrir.
+2. **Emplacement des dépôts** : un dossier par dépôt (`owner/repo` et son chemin absolu) et/ou un dossier par défaut (`/Users/moi/dev/{repo}`). `~` est accepté une fois le dossier personnel renseigné.
+3. **Tester** : coller une URL de fichier GitHub (`https://github.com/acme/app/blob/main/src/App.kt#L42`) pour voir le chemin résolu et l'ouvrir.
 
-Android Studio / IntelliJ : ouverture via le lien `idea://open` enregistré par l'IDE. Chrome demande une confirmation au premier clic.
-
-Xcode : il n'a pas de lien pour ouvrir un fichier à une ligne. Installer une fois l'app relais (macOS, Xcode installé) :
-
-```bash
-brew install --cask jean-melikian/tap/reviewhopper-xcode
-```
-
-Elle crée `~/Applications/ReviewHopper Xcode.app`, qui reçoit les liens `reviewhopper-xcode://` et lance `xed --line`. Désinstaller : `brew uninstall --cask reviewhopper-xcode`. Sans Homebrew : `bash helpers/xcode/install.sh` (et `--uninstall`) depuis le dossier de l'extension.
+Android Studio / IntelliJ : ouverture via le lien `idea://open` enregistré par l'IDE. Xcode : voir l'[étape 4](#4-xcode-uniquement--lapp-relais).
