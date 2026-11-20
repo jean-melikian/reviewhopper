@@ -1,174 +1,180 @@
 # ReviewHopper
 
-Extension navigateur qui ouvre dans l'éditeur local le fichier et la ligne d'une review GitHub : diff de PR, commit, commentaires de review.
+**English** | [Français](README.fr.md)
 
-- Bouton **↗** au survol d'une ligne du diff, ou Alt+clic (⌥+clic sur Mac).
-- Onglets **Files changed** et **Conversation** d'une PR, pages de commit.
-- Éditeurs : VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed, Android Studio, IntelliJ et autres IDE JetBrains, Xcode, ou modèle d'URL personnalisé.
-- Navigateurs : Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera (famille Chromium) ; Firefox, Zen (famille Firefox).
+Browser extension that opens the file and line of a GitHub review in your local editor: PR diffs, commits, review comments.
 
-## Sommaire
+- **↗** button when hovering a diff line, or Alt+click (⌥+click on Mac).
+- Works in the **Files changed** and **Conversation** tabs of a PR, and on commit pages.
+- Editors: VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed, Android Studio, IntelliJ and other JetBrains IDEs, Xcode, or a custom URL template.
+- Browsers: Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera (Chromium family); Firefox, Zen (Firefox family).
 
-- [Démarrage rapide](#démarrage-rapide)
-- [Utilisation](#utilisation)
-- [Réglages](#réglages)
-- [Dépannage](#dépannage)
-- [Build depuis les sources](#build-depuis-les-sources)
-- [Publier une version](#publier-une-version)
+> The extension's interface (settings page, messages) is currently in French only.
 
-## Démarrage rapide
+## Contents
 
-### 1. Télécharger l'extension
+- [Quick setup](#quick-setup)
+- [Usage](#usage)
+- [Settings](#settings)
+- [Troubleshooting](#troubleshooting)
+- [Build from source](#build-from-source)
+- [Releasing](#releasing)
 
-Sur la page [Releases](https://github.com/jean-melikian/reviewhopper/releases/latest), télécharger **un seul** fichier, selon le navigateur :
+## Quick setup
 
-| Navigateur | Fichier |
+### 1. Download the extension
+
+From the [Releases](https://github.com/jean-melikian/reviewhopper/releases/latest) page, download **one** file, depending on your browser:
+
+| Browser | File |
 |---|---|
 | Chrome, Edge, Brave, Arc, Dia, Vivaldi, Opera | `reviewhopper-<version>-chrome.zip` |
 | Firefox, Zen | `reviewhopper-<version>-firefox.zip` |
 
-Le fichier `-sources.zip` ne sert qu'à la revue de Mozilla.
+The `-sources.zip` file is only used for Mozilla's review.
 
-### 2. L'ajouter au navigateur
+### 2. Add it to your browser
 
-**Famille Chromium**
+**Chromium family**
 
-1. Décompresser le zip (double-clic sur macOS) et ranger le dossier obtenu à un endroit où il restera, par exemple `~/Applications/ReviewHopper`. Le navigateur charge l'extension depuis ce dossier : s'il est supprimé ou déplacé, l'extension disparaît.
-2. Ouvrir la page des extensions : `chrome://extensions` (Chrome, Arc, Dia), `edge://extensions`, `brave://extensions`, `vivaldi://extensions` ou `opera://extensions`.
-3. Activer le **Mode développeur**.
-4. Cliquer sur **Charger l'extension non empaquetée** et choisir le dossier décompressé.
+1. Unzip the file (double-click on macOS) and move the resulting folder somewhere it will stay, for example `~/Applications/ReviewHopper`. The browser loads the extension from this folder: if it is deleted or moved, the extension disappears.
+2. Open the extensions page: `chrome://extensions` (Chrome, Arc, Dia), `edge://extensions`, `brave://extensions`, `vivaldi://extensions` or `opera://extensions`.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked** and select the unzipped folder.
 
-**Famille Firefox**
+**Firefox family**
 
-1. Ouvrir `about:debugging#/runtime/this-firefox`.
-2. Cliquer sur **Charger un module complémentaire temporaire** et choisir le zip téléchargé, sans le décompresser.
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on** and select the downloaded zip, without unzipping it.
 
-Tant que l'extension n'est pas publiée sur addons.mozilla.org, Firefox la retire à chaque redémarrage : il faut la recharger de la même façon.
+Until the extension is published on addons.mozilla.org, Firefox removes it on every restart: load it again the same way.
 
-### 3. Choisir l'éditeur
+### 3. Choose your editor
 
-La page de réglages s'ouvre après l'installation (sinon, cliquer sur l'icône de l'extension).
+The settings page opens after installation (otherwise, click the extension icon).
 
-1. Choisir l'éditeur.
-2. Indiquer où se trouvent les clones locaux (voir [Réglages](#réglages)).
+1. Choose your editor.
+2. Tell the extension where your local clones are (see [Settings](#settings)).
 
-Selon l'éditeur, il reste ou non quelque chose à installer :
+Depending on the editor, there may be one more thing to install:
 
-| Éditeur | À installer en plus |
+| Editor | Extra install |
 |---|---|
-| VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed | Rien |
-| Android Studio, IntelliJ et autres IDE JetBrains | Rien : l'IDE gère déjà les liens `idea://` |
-| Xcode | L'app relais : [étape 4](#4-xcode-uniquement--lapp-relais) |
+| VS Code, VS Code Insiders, Cursor, Windsurf, VSCodium, Zed | None |
+| Android Studio, IntelliJ and other JetBrains IDEs | None: the IDE already handles `idea://` links |
+| Xcode | The relay app: [step 4](#4-xcode-only-the-relay-app) |
 
-Au premier clic, le navigateur demande l'autorisation d'ouvrir l'éditeur : cocher "Toujours autoriser".
+On the first click, the browser asks permission to open the editor: tick "Always allow".
 
-### 4. Xcode uniquement : l'app relais
+### 4. Xcode only: the relay app
 
-**À ne faire que si l'éditeur choisi est Xcode.** Les autres éditeurs n'en ont pas besoin.
+**Only do this if your editor is Xcode.** Other editors don't need it.
 
-Xcode n'a pas de lien pour ouvrir un fichier à une ligne précise. Une petite app relais reçoit les liens `reviewhopper-xcode://` de l'extension et lance `xed --line`. Elle est construite sur la machine et ne tourne que le temps d'ouvrir le fichier. Prérequis : macOS, Xcode et [Homebrew](https://brew.sh).
+Xcode has no link to open a file at a given line. A small relay app receives the extension's `reviewhopper-xcode://` links and runs `xed --line`. It is built on your machine and only runs while opening the file. Requirements: macOS, Xcode and [Homebrew](https://brew.sh).
 
 ```bash
 brew install --cask jean-melikian/tap/reviewhopper-xcode
 ```
 
-- Mettre à jour : `brew upgrade --cask reviewhopper-xcode`
-- Désinstaller : `brew uninstall --cask reviewhopper-xcode`
-- Sans Homebrew, depuis un clone du dépôt : `bash helpers/xcode/install.sh` (désinstaller : `bash helpers/xcode/install.sh --uninstall`)
+- Update: `brew upgrade --cask reviewhopper-xcode`
+- Uninstall: `brew uninstall --cask reviewhopper-xcode`
+- Without Homebrew, from a clone of this repository: `bash helpers/xcode/install.sh` (uninstall: `bash helpers/xcode/install.sh --uninstall`)
 
-### Mettre à jour l'extension
+### Updating the extension
 
-- **Chromium** : remplacer le contenu du dossier de l'étape 2 par celui du nouveau zip, cliquer sur ↻ sur la carte de l'extension, puis recharger les onglets GitHub. Garder le même dossier conserve les réglages : charger un autre dossier crée une nouvelle extension, sans réglages.
-- **Firefox** : charger le nouveau zip comme à l'étape 2.
+- **Chromium**: replace the contents of the step 2 folder with the new zip's contents, click ↻ on the extension card, then reload your GitHub tabs. Keeping the same folder keeps your settings: loading another folder creates a new extension, without settings.
+- **Firefox**: load the new zip as in step 2.
 
-## Utilisation
+## Usage
 
-- Onglet **Files changed** d'une PR ou page de commit : survoler une ligne puis cliquer sur **↗**, ou Alt+clic (⌥+clic sur Mac) sur la ligne.
-- Alt+clic sur le nom d'un fichier : ouvre le fichier à la ligne 1.
-- Onglet **Conversation** : même chose sur l'extrait de code d'un commentaire de review. Alt+clic sur le nom du fichier ouvre la ligne commentée.
-- Bouton de copie à côté du nom du fichier (onglet Conversation) : copie le chemin du fichier, à coller dans la recherche de fichiers de l'éditeur (⌘⇧O dans Xcode et Android Studio, ⌘P dans VS Code).
+- **Files changed** tab of a PR, or a commit page: hover a line and click **↗**, or Alt+click (⌥+click on Mac) the line.
+- Alt+click a file name: opens the file at line 1.
+- **Conversation** tab: same on the code snippet of a review comment. Alt+click the file name opens the commented line.
+- Copy button next to the file name (Conversation tab): copies the file path, to paste in your editor's file search (⌘⇧O in Xcode and Android Studio, ⌘P in VS Code).
 
-La ligne ouverte est celle de la **nouvelle version** du fichier (branche de la PR). Pour une ligne supprimée, l'extension ouvre la ligne la plus proche et le signale.
+The opened line is the one in the **new version** of the file (the PR branch). For a deleted line, the extension opens the closest line and says so.
 
-## Réglages
+## Settings
 
-Enregistrés automatiquement.
+Saved automatically.
 
-1. **Éditeur** : voir le tableau de l'[étape 3](#3-choisir-léditeur).
-2. **Emplacement des dépôts** : un dossier par dépôt (`owner/repo` et son chemin absolu), et/ou un dossier par défaut (`/Users/moi/dev/{repo}`). `~` est accepté une fois le dossier personnel renseigné.
-3. **Tester** : coller une URL de fichier GitHub (`https://github.com/acme/app/blob/main/src/App.kt#L42`) pour voir le chemin résolu et l'ouvrir.
-4. **Affichage** : bouton ↗ au survol, ou Alt+clic uniquement.
+1. **Editor** ("Éditeur"): see the table in [step 3](#3-choose-your-editor).
+2. **Repository locations** ("Emplacement des dépôts"): one folder per repository (`owner/repo` and its absolute path), and/or a default folder (`/Users/me/dev/{repo}`). `~` is accepted once your home folder is filled in.
+3. **Test** ("Tester"): paste a GitHub file URL (`https://github.com/acme/app/blob/main/src/App.kt#L42`) to see the resolved path and open it.
+4. **Display** ("Affichage"): ↗ button on hover, or Alt+click only.
 
-## Dépannage
+## Troubleshooting
 
-**Le bouton ↗ n'apparaît pas**
-- Recharger l'onglet GitHub : les onglets ouverts avant l'installation ne sont pas pris en compte.
-- Vérifier dans les réglages que "Afficher le bouton ↗ au survol des lignes" est coché. Alt+clic marche dans tous les cas.
+Messages are quoted as the extension shows them (in French).
 
-**"Aucun dossier local configuré pour owner/repo"**
-- Ajouter le dépôt dans les réglages, ou renseigner un dossier par défaut.
+**The ↗ button doesn't show up**
+- Reload the GitHub tab: tabs opened before installation are not picked up.
+- In the settings, check that "Afficher le bouton ↗ au survol des lignes" is ticked. Alt+click works either way.
 
-**Rien ne s'ouvre au clic**
-- Le navigateur a pu bloquer le lien : cliquer à nouveau et autoriser l'ouverture.
-- Android Studio / JetBrains : lancer l'IDE une fois pour qu'il enregistre les liens `idea://`.
-- Xcode : vérifier que l'app relais est installée. Cette commande doit afficher son emplacement, sinon l'installer ([étape 4](#4-xcode-uniquement--lapp-relais)) :
+**"Aucun dossier local configuré pour owner/repo" (no local folder configured)**
+- Add the repository in the settings, or set a default folder.
+
+**Nothing opens on click**
+- The browser may have blocked the link: click again and allow it.
+- Android Studio / JetBrains: launch the IDE once so it registers `idea://` links.
+- Xcode: check that the relay app is installed. This command should print its location; if not, install it ([step 4](#4-xcode-only-the-relay-app)):
 
   ```bash
   mdfind "kMDItemCFBundleIdentifier == 'com.reviewhopper.xcode'"
   ```
 
-- Utiliser la zone **Tester** des réglages pour vérifier le dossier et le lien générés.
+- Use the **Tester** area in the settings to check the folder and the generated link.
 
-**Le fichier s'ouvre à une ligne décalée, ou est introuvable**
-- Le clone local doit être sur la branche de la PR : la ligne indiquée est celle de la nouvelle version du fichier.
-- Vérifier le dossier associé au dépôt avec la zone **Tester** des réglages.
+**The file opens at the wrong line, or can't be found**
+- Your local clone must be on the PR branch: the line is the one in the new version of the file.
+- Check the folder mapped to the repository with the **Tester** area in the settings.
 
-**"ReviewHopper a été mis à jour : recharger la page"**
-- L'extension a été rechargée ou mise à jour pendant que l'onglet était ouvert : recharger l'onglet GitHub.
+**"ReviewHopper a été mis à jour : recharger la page" (updated, reload the page)**
+- The extension was reloaded or updated while the tab was open: reload the GitHub tab.
 
-**"Chemin de fichier refusé"**
-- Le chemin lu dans la page contient `..`, un chemin absolu ou des caractères invalides : l'extension refuse de l'ouvrir, par sécurité.
+**"Chemin de fichier refusé" (file path rejected)**
+- The path read from the page contains `..`, an absolute path or invalid characters: the extension refuses to open it, for security.
 
-**Xcode : notification "Fichier téléchargé refusé"**
-- L'app relais refuse les fichiers téléchargés (marqués en quarantaine par macOS), pour qu'un site ne puisse pas faire ouvrir un fichier piégé. Travailler sur un dépôt récupéré avec `git clone`, pas sur une archive téléchargée.
+**Xcode: "Fichier téléchargé refusé" notification (downloaded file rejected)**
+- The relay app rejects downloaded files (quarantined by macOS), so a website can't make Xcode open a malicious file. Work on a repository obtained with `git clone`, not on a downloaded archive.
 
-**IntelliJ / JetBrains : "IDE injoignable"**
-- Configurer le dossier local du dépôt : l'extension passe alors par les liens `idea://`, sans serveur.
-- Sinon, dans l'IDE : Settings, Tools, Web Browsers and Preview, Built-in Server : port 63342 et "Allow unsigned requests" coché.
+**IntelliJ / JetBrains: "IDE injoignable" (IDE unreachable)**
+- Set the repository's local folder: the extension then uses `idea://` links, no server needed.
+- Otherwise, in the IDE: Settings, Tools, Web Browsers and Preview, Built-in Server: port 63342 and "Allow unsigned requests" ticked.
 
-**Firefox : l'extension a disparu**
-- Normal après un redémarrage tant qu'elle n'est pas sur addons.mozilla.org : la recharger (étape 2).
+**Firefox: the extension is gone**
+- Expected after a restart until it is on addons.mozilla.org: load it again (step 2).
 
-## Build depuis les sources
+## Build from source
 
-Prérequis : Node.js 22 ou plus récent.
+Requirements: Node.js 22 or later.
 
 ```bash
 git clone https://github.com/jean-melikian/reviewhopper.git
 cd reviewhopper
 npm install
-npm run build          # Chromium : .output/chrome-mv3
-npm run build:firefox  # Firefox : .output/firefox-mv3
+npm run build          # Chromium: .output/chrome-mv3
+npm run build:firefox  # Firefox: .output/firefox-mv3
 ```
 
-Charger ensuite le dossier `.output/chrome-mv3` (Chromium) ou le fichier `.output/firefox-mv3/manifest.json` (Firefox) comme à l'[étape 2](#2-lajouter-au-navigateur).
+Then load the `.output/chrome-mv3` folder (Chromium) or the `.output/firefox-mv3/manifest.json` file (Firefox) as in [step 2](#2-add-it-to-your-browser).
 
-Autres commandes :
+Other commands:
 
-- `npm run dev` / `npm run dev:firefox` : navigateur de test avec rechargement automatique.
-- `npm run compile` : vérification TypeScript.
-- `npm run zip` / `npm run zip:firefox` : archives des stores (Chrome Web Store, Edge Add-ons, addons.mozilla.org), plus l'archive des sources demandée par Mozilla.
+- `npm run dev` / `npm run dev:firefox`: test browser with live reload.
+- `npm run compile`: TypeScript check.
+- `npm run zip` / `npm run zip:firefox`: store archives (Chrome Web Store, Edge Add-ons, addons.mozilla.org), plus the source archive Mozilla requires.
 
-## Publier une version
+## Releasing
 
-1. Mettre la nouvelle version dans `package.json` (ex. `1.3.0`) et committer.
-2. Pousser le tag correspondant :
+1. Set the new version in `package.json` (e.g. `1.3.0`) and commit.
+2. Push the matching tag:
 
    ```bash
    git tag v1.3.0 && git push origin v1.3.0
    ```
 
-3. Le workflow `Release` vérifie que le tag et `package.json` concordent, construit, lint le build Firefox, puis crée la release GitHub avec les zips Chrome, Firefox et sources (plus `SHA256SUMS.txt`).
-4. Si `helpers/xcode/` a changé : reporter dans le cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`) les `version` et `sha256` affichés dans le résumé du workflow.
+3. The `Release` workflow checks that the tag matches `package.json`, builds, lints the Firefox build, then creates the GitHub release with the Chrome, Firefox and source zips (plus `SHA256SUMS.txt`).
+4. If `helpers/xcode/` changed: copy the `version` and `sha256` shown in the workflow summary into the cask (`jean-melikian/homebrew-tap`, `Casks/reviewhopper-xcode.rb`).
 
-Le workflow `CI` vérifie les types et les deux builds à chaque push sur `main` et à chaque PR.
+The `CI` workflow checks types and both builds on every push to `main` and every PR.
