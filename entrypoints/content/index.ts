@@ -13,9 +13,13 @@ export default defineContentScript({
   });
 
   const LINE_CELL = 'td[data-line-number]:not(.diff-text-cell)';
+  // Diff en grille (relevé le 2026-11-20 sur une page de commit) : numéros dans td.diff-line-number, sans
+  // data-line-number. Unifiée : [ancien, nouveau, texte] ; split : [ancien, texte, nouveau, texte].
+  // Le numéro du nouveau fichier est toujours la cellule juste avant td.right-side-diff-cell.
+  const GRID_CELL = 'td.diff-line-number:not([data-line-number])';
   // Snippet de diff d'un fil de review dans l'onglet Conversation (une seule colonne de numéros)
   const THREAD_CELL = 'td[class*="diffLineNumber"]';
-  const ANY_CELL = `${LINE_CELL}, ${THREAD_CELL}`;
+  const ANY_CELL = `${LINE_CELL}, ${GRID_CELL}, ${THREAD_CELL}`;
   const THREAD_LINK = 'h2 a[href*="#r"]';
   // Vrai en-tête de fil de review : lien vers ".../pull/<n>/changes#r<id>" (ou /files), hors du corps
   // d'un commentaire (un "## [chemin](...#r1)" en markdown ne doit pas passer pour un en-tête).
@@ -73,6 +77,7 @@ export default defineContentScript({
   // Returns the line number in the PR's *new* version of the file.
   function lineFor(cell: Element): { line: number; approx: boolean } {
     if (cell.matches(THREAD_CELL)) return threadCellLine(cell);
+    if (cell.matches(GRID_CELL)) return gridCellLine(cell);
     const row = cell.closest('tr');
     const cells = row ? [...row.querySelectorAll(LINE_CELL)] : [cell];
     const own = parseInt(cell.getAttribute('data-line-number') ?? '', 10);
@@ -106,6 +111,31 @@ export default defineContentScript({
     }
     const line = parseInt(target.getAttribute('data-line-number') ?? '', 10);
     return { line, approx: isOld(target) || cell.classList.contains('blob-num-deletion') };
+  }
+
+  const numOf = (c: Element | null | undefined) => {
+    const m = (c?.textContent ?? '').trim().match(/^\d+$/);
+    return m ? +m[0] : null;
+  };
+  const gridNewCell = (row: Element) => {
+    const prev = row.querySelector('td.right-side-diff-cell')?.previousElementSibling;
+    return prev?.matches('td.diff-line-number') ? prev : null;
+  };
+  function gridCellLine(cell: Element): { line: number; approx: boolean } {
+    const row = cell.closest('tr')!;
+    const newCell = gridNewCell(row);
+    const n = numOf(newCell);
+    if (n != null) {
+      // Ligne modifiée vue côté ancien (split) : la ligne d'en face est une approximation.
+      const approx = cell !== newCell && numOf(cell) != null && !row.querySelector('.diff-line-number-neutral');
+      return { line: n, approx };
+    }
+    // Ligne supprimée : ligne du nouveau fichier la plus proche (en dessous d'abord).
+    const rows = [...row.closest('table')!.querySelectorAll('tr')].filter((r) => numOf(gridNewCell(r)) != null);
+    const below = rows.find((r) => row.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const above = rows.filter((r) => row.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING).pop();
+    const near = below || above;
+    return { line: (near && numOf(gridNewCell(near))) || 1, approx: true };
   }
 
   // Conversation snippet: one number column, or two (old, new) as on context lines.

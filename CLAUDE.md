@@ -48,6 +48,13 @@ Vérifié après migration (2026-11-18) : `tsc` sans erreur, builds Chrome et Fi
 - Ancienne UI (non revérifiée, gardée en fallback) : `.file[data-tagsearch-path]`,
   `.file-header[data-path]`, `td.blob-num[data-line-number]`, `blob-num-deletion`, `data-split-side`.
 - Vue unifiée de la nouvelle UI : **pas testée** (basculer de vue change la préférence du compte GitHub).
+- **Diff en grille hors preview** (relevé le 2026-11-20 sur une page de commit, sans connexion) : la structure
+  ci-dessus vient de la preview "nouvelle PR overview" du compte. Sans preview, les numéros sont dans
+  `td.diff-line-number` **sans** `data-line-number` ni `data-diff-side` (`GRID_CELL`, `gridCellLine`).
+  Unifiée : `[ancien, nouveau, texte]` ; split : `[ancien, texte, nouveau, texte]` ; le numéro du nouveau fichier est
+  la cellule juste avant `td.right-side-diff-cell`. Vide = ligne supprimée (ligne la plus proche, approx).
+  Vérifié en unifiée sur la vraie page (extension injectée dans Chrome headless) ; split non vérifiée (GitHub
+  renvoyait sa page d'erreur). Le code de la preview n'est pas touché (sélecteur exclusif).
 
 ## Onglet Conversation : fils de review (relevé le 2026-11-17 sur une PR privée)
 
